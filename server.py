@@ -25,6 +25,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 CACHE_TTL_SECONDS = 45
+TREND_CACHE_TTL_SECONDS = int(os.environ.get("R02_TREND_CACHE_TTL_SECONDS", "1800"))
 FETCH_TIMEOUT_SECONDS = float(os.environ.get("R02_FETCH_TIMEOUT_SECONDS", "4"))
 API_WORKERS = int(os.environ.get("R02_API_WORKERS", "12"))
 
@@ -48,6 +49,7 @@ R02_CURRENT = {
 }
 
 _cache: dict[str, Any] = {"ts": 0.0, "payload": None}
+_trend_cache: dict[str, dict[str, Any]] = {}
 
 
 class FetchError(RuntimeError):
@@ -226,6 +228,39 @@ def get_sector_klines(code: str, days: int = TREND_DAYS) -> list[dict[str, Any]]
     return parsed
 
 
+def clone_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [dict(row) for row in rows]
+
+
+def apply_trend_cache(
+    sector: dict[str, Any],
+    code: str,
+    now: float,
+    source: str,
+) -> bool:
+    cached = _trend_cache.get(code)
+    if not cached:
+        return False
+    trend = clone_rows(cached["rows"])
+    sector["trend10"] = trend
+    sector["trend5"] = trend
+    sector["trend10Source"] = source
+    sector["trend10Cached"] = True
+    sector["trend10CachedAt"] = cached["updatedAt"]
+    sector["trend10CacheAgeSeconds"] = round(now - cached["ts"])
+    return True
+
+
+def store_trend_cache(code: str, trend: list[dict[str, Any]], now: float) -> str:
+    updated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    _trend_cache[code] = {
+        "ts": now,
+        "updatedAt": updated_at,
+        "rows": clone_rows(trend),
+    }
+    return updated_at
+
+
 def summarize_map_param(payload: dict[str, Any]) -> dict[str, Any]:
     values = []
     data = payload.get("data")
@@ -362,14 +397,32 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
 
             for sector in top_sectors:
                 code = str(sector.get("code") or "")
+                cached = _trend_cache.get(code)
+                if cached and now - cached["ts"] < TREND_CACHE_TTL_SECONDS:
+                    apply_trend_cache(sector, code, now, "server-cache")
+                    continue
+
                 try:
                     trend = get_sector_klines(code, TREND_DAYS)
+                    if len(trend) < 2:
+                        raise FetchError(f"not enough kline rows: {len(trend)}")
                     sector["trend10"] = trend
                     sector["trend5"] = trend
+                    sector["trend10Source"] = "live"
+                    sector["trend10Cached"] = False
+                    sector["trend10UpdatedAt"] = store_trend_cache(code, trend, now)
                 except Exception as exc:
-                    sector["trend10"] = []
-                    sector["trend5"] = []
-                    warnings.append(f"{code} kline: {exc}")
+                    if apply_trend_cache(sector, code, now, "server-cache-stale"):
+                        warnings.append(
+                            f"{code} kline: {exc}; using cached trend from "
+                            f"{sector['trend10CachedAt']}"
+                        )
+                    else:
+                        sector["trend10"] = []
+                        sector["trend5"] = []
+                        sector["trend10Source"] = "missing"
+                        sector["trend10Cached"] = False
+                        warnings.append(f"{code} kline: {exc}")
 
             for future in concurrent.futures.as_completed(leader_futures):
                 sector, code = leader_futures[future]
@@ -392,6 +445,7 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
         "cacheTtlSeconds": CACHE_TTL_SECONDS,
         "cacheAgeSeconds": 0,
         "trendDays": TREND_DAYS,
+        "trendCacheTtlSeconds": TREND_CACHE_TTL_SECONDS,
         "source": {
             "sectorRank": "Eastmoney push2 clist, fs=m:90+t:2, sorted by f3",
             "sectorKline": "Eastmoney push2his daily kline, secid=90.BKxxxx",

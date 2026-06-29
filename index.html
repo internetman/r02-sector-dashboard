@@ -276,6 +276,10 @@
       font-weight: 750;
     }
 
+    .trend-cache-note {
+      color: var(--amber);
+    }
+
     .trend-row td {
       padding: 0;
       background: rgba(255, 255, 255, 0.2);
@@ -545,6 +549,8 @@
     const refreshBtn = document.getElementById("refreshBtn");
     const statusLine = document.getElementById("statusLine");
     const warningsBox = document.getElementById("warnings");
+    const TREND_CACHE_KEY = "r02-sector-dashboard:trend-cache:v1";
+    let hasRendered = false;
 
     const fmt = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
     const fmt0 = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 });
@@ -580,6 +586,68 @@
       const parts = String(value || "").split("-");
       if (parts.length === 3) return `${Number(parts[1])}/${Number(parts[2])}`;
       return String(value || "").slice(-5);
+    }
+
+    function shortDateTime(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value || "--");
+      return date.toLocaleString("zh-CN", {
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
+    }
+
+    function hasTrend(points) {
+      return Array.isArray(points) && points.filter((p) => typeof p.close === "number").length >= 2;
+    }
+
+    function readTrendCache() {
+      try {
+        return JSON.parse(localStorage.getItem(TREND_CACHE_KEY) || "{}");
+      } catch {
+        return {};
+      }
+    }
+
+    function writeTrendCache(cache) {
+      try {
+        localStorage.setItem(TREND_CACHE_KEY, JSON.stringify(cache));
+      } catch {
+        // Browser storage is a convenience cache; ignore quota/private-mode failures.
+      }
+    }
+
+    function hydrateTrendCache(data) {
+      data.warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      const cache = readTrendCache();
+      const nowText = data.generatedAt || new Date().toISOString();
+
+      for (const sector of data.top5 || []) {
+        const code = sector.code;
+        if (!code) continue;
+        const trend = sector.trend10 || sector.trend5 || [];
+        if (hasTrend(trend)) {
+          cache[code] = {
+            name: sector.name,
+            updatedAt: sector.trend10UpdatedAt || sector.trend10CachedAt || nowText,
+            rows: trend
+          };
+          continue;
+        }
+        const cached = cache[code];
+        if (!cached || !hasTrend(cached.rows)) continue;
+        sector.trend10 = cached.rows;
+        sector.trend5 = cached.rows;
+        sector.trend10Source = "browser-cache";
+        sector.trend10Cached = true;
+        sector.trend10CachedAt = cached.updatedAt;
+        data.warnings.push(`${code} kline: using browser cached trend from ${cached.updatedAt}`);
+      }
+
+      writeTrendCache(cache);
     }
 
     function sparkline(points, color) {
@@ -785,6 +853,9 @@
       return sectors.map((sector) => {
         const color = sector.pct >= 0 ? "var(--red)" : "var(--green)";
         const trend = sector.trend10 || sector.trend5 || [];
+        const cacheNote = sector.trend10Cached
+          ? ` · <span class="trend-cache-note">沿用上次趋势 ${escapeHtml(shortDateTime(sector.trend10CachedAt))}</span>`
+          : "";
         return `
           <tr class="sector-main-row">
             <td><span class="rank-badge">${sector.rank}</span></td>
@@ -805,7 +876,7 @@
               <div class="trend-panel">
                 <div class="trend-panel-head">
                   <span>${escapeHtml(sector.name)} · 10日相对趋势</span>
-                  <span>以第1日收盘为0%，最近 ${trend.length || "--"} 个交易日</span>
+                  <span>以第1日收盘为0%，最近 ${trend.length || "--"} 个交易日${cacheNote}</span>
                 </div>
                 ${sparkline(trend, color)}
                 ${renderAttribution(sector, trend)}
@@ -858,6 +929,7 @@
     }
 
     function render(data) {
+      hydrateTrendCache(data);
       const dist = data.marketDistribution || {};
       const top1 = data.top5?.[0];
       const topNames = (data.top5 || []).map((s) => s.name).join(" / ");
@@ -980,6 +1052,7 @@
         warningsBox.style.display = "none";
         warningsBox.textContent = "";
       }
+      hasRendered = true;
     }
 
     async function load(force = false) {
@@ -991,9 +1064,15 @@
         const data = await response.json();
         render(data);
       } catch (error) {
-        app.className = "loading";
-        app.textContent = `数据拉取失败：${error.message}`;
-        statusLine.textContent = "更新失败";
+        if (hasRendered) {
+          statusLine.textContent = "更新失败，保留上次画面";
+          warningsBox.style.display = "block";
+          warningsBox.innerHTML = `本次更新失败：${escapeHtml(error.message)}<br>页面已保留上一次成功数据。`;
+        } else {
+          app.className = "loading";
+          app.textContent = `数据拉取失败：${error.message}`;
+          statusLine.textContent = "更新失败";
+        }
       } finally {
         refreshBtn.disabled = false;
       }
