@@ -36,7 +36,7 @@ R02_DASHBOARD_PORT=8766 python3 server.py
 index.html          # 静态页面
 server.py           # 本地服务 + 共享数据抓取逻辑
 api/dashboard.py    # Vercel Python Serverless Function
-vercel.json         # Function 超时配置
+vercel.json         # Other 框架、空构建命令、根目录静态输出、API 路由
 ```
 
 Vercel 上的访问路径：
@@ -49,10 +49,11 @@ Vercel 上的访问路径：
 1. 在本目录初始化独立 Git 仓库并提交文件。
 2. 在 GitHub 创建一个新仓库，把本目录推送上去。
 3. 在 Vercel 新建 Project，导入该 GitHub 仓库。
-4. Framework Preset 选择 `Other` 或保持自动识别；不需要 Build Command。
+4. Framework Preset 选择 `Other`；不需要 Build Command。
 5. 部署完成后打开 Vercel URL。
 
 本项目没有 npm / pip 依赖，当前只使用 Python 标准库。
+Vercel 函数会并发拉取同一批公开数据源，并使用较短上游超时；单个数据源失败时页面保留其它模块并在 warning 中显示原因。
 
 ## 口径
 

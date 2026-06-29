@@ -9,6 +9,7 @@ to avoid aggressive polling of public data sources.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import datetime as dt
 import json
 import math
@@ -24,8 +25,11 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 CACHE_TTL_SECONDS = 45
+FETCH_TIMEOUT_SECONDS = float(os.environ.get("R02_FETCH_TIMEOUT_SECONDS", "4"))
+API_WORKERS = int(os.environ.get("R02_API_WORKERS", "12"))
 
 EASTMONEY_REFERER = "https://quote.eastmoney.com/"
+EASTMONEY_UT = "fa5fd1943c7b386f172d6893dbfba10b"
 DAPANYUNTU_REFERER = "https://dapanyuntu.com/"
 SCKD_REFERER = "https://sckd.dapanyuntu.com/"
 
@@ -50,7 +54,9 @@ class FetchError(RuntimeError):
     pass
 
 
-def fetch_json(url: str, referer: str, timeout: float = 8.0) -> dict[str, Any]:
+def fetch_json(url: str, referer: str, timeout: float | None = None) -> dict[str, Any]:
+    if timeout is None:
+        timeout = FETCH_TIMEOUT_SECONDS
     request = urllib.request.Request(
         url,
         headers={
@@ -193,7 +199,7 @@ def get_sector_klines(code: str, days: int = TREND_DAYS) -> list[dict[str, Any]]
         f"?secid=90.{urllib.parse.quote(code)}"
         "&fields1=f1,f2,f3,f4,f5,f6"
         "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
-        f"&klt=101&fqt=1&beg={begin}&end={end}&lmt=40"
+        f"&ut={EASTMONEY_UT}&klt=101&fqt=1&beg={begin}&end={end}&lmt=40"
     )
     payload = fetch_json(url, EASTMONEY_REFERER)
     rows = payload.get("data", {}).get("klines") or []
@@ -310,44 +316,76 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
         return cached
 
     warnings = []
-    indices = []
-    market_distribution = {}
-    r02_breadth = {}
-    sectors = []
+    indices: list[dict[str, Any]] = []
+    market_distribution: dict[str, Any] = {}
+    r02_breadth: dict[str, Any] = {}
+    sectors: list[dict[str, Any]] = []
 
-    try:
-        indices = get_market_indices()
-    except Exception as exc:
-        warnings.append(str(exc))
+    def read_future(
+        label: str,
+        future: concurrent.futures.Future[Any],
+        default: Any,
+    ) -> Any:
+        try:
+            return future.result()
+        except Exception as exc:
+            warnings.append(f"{label}: {exc}")
+            return default
 
-    try:
-        market_distribution = get_market_distribution()
-    except Exception as exc:
-        warnings.append(str(exc))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        base_futures = {
+            "indices": executor.submit(get_market_indices),
+            "marketDistribution": executor.submit(get_market_distribution),
+            "r02Breadth": executor.submit(get_r02_breadth),
+            "sectorRank": executor.submit(get_sector_rank, 30),
+        }
+        indices = read_future("indices", base_futures["indices"], [])
+        market_distribution = read_future(
+            "marketDistribution",
+            base_futures["marketDistribution"],
+            {},
+        )
+        r02_breadth = read_future("r02Breadth", base_futures["r02Breadth"], {})
+        sectors = read_future("sectorRank", base_futures["sectorRank"], [])
 
-    try:
-        r02_breadth = get_r02_breadth()
-    except Exception as exc:
-        warnings.append(str(exc))
+    top_sectors = sectors[:5]
+    if top_sectors:
+        detail_workers = min(API_WORKERS, max(1, len(top_sectors)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=detail_workers) as executor:
+            leader_futures = {}
+            for sector in top_sectors:
+                code = str(sector.get("code") or "")
+                leader_futures[executor.submit(get_sector_leaders, code, 10)] = (
+                    sector,
+                    code,
+                )
 
-    try:
-        sectors = get_sector_rank(30)
-        for sector in sectors[:5]:
-            try:
-                trend = get_sector_klines(sector["code"], TREND_DAYS)
-                sector["trend10"] = trend
-                sector["trend5"] = trend
-            except Exception as exc:
-                sector["trend10"] = []
-                sector["trend5"] = []
-                warnings.append(f"{sector['code']} kline: {exc}")
-            try:
-                sector["leaders10"] = get_sector_leaders(sector["code"], 10)
-            except Exception as exc:
-                sector["leaders10"] = []
-                warnings.append(f"{sector['code']} leaders: {exc}")
-    except Exception as exc:
-        warnings.append(str(exc))
+            for sector in top_sectors:
+                code = str(sector.get("code") or "")
+                try:
+                    trend = get_sector_klines(code, TREND_DAYS)
+                    sector["trend10"] = trend
+                    sector["trend5"] = trend
+                except Exception as exc:
+                    sector["trend10"] = []
+                    sector["trend5"] = []
+                    warnings.append(f"{code} kline: {exc}")
+
+            for future in concurrent.futures.as_completed(leader_futures):
+                sector, code = leader_futures[future]
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    sector["leaders10"] = []
+                    warnings.append(f"{code} leaders: {exc}")
+                    continue
+
+                sector["leaders10"] = result
+
+    for sector in top_sectors:
+        sector.setdefault("trend10", [])
+        sector.setdefault("trend5", sector["trend10"])
+        sector.setdefault("leaders10", [])
 
     payload = {
         "generatedAt": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
