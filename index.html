@@ -258,6 +258,24 @@
       font-weight: 850;
     }
 
+    .spark-empty {
+      display: grid;
+      place-items: center;
+      border: 1px dashed rgba(216, 211, 199, 0.95);
+      background: rgba(255, 255, 255, 0.35);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+      text-align: center;
+    }
+
+    .spark-empty span {
+      display: block;
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
     .trend-row td {
       padding: 0;
       background: rgba(255, 255, 255, 0.2);
@@ -566,11 +584,19 @@
 
     function sparkline(points, color) {
       if (!points || points.length === 0) {
-        return `<svg class="spark" role="img" aria-label="无趋势数据"></svg>`;
+        return `
+          <div class="spark spark-empty" role="img" aria-label="无趋势数据">
+            <div>趋势数据暂缺<span>历史 K 线源未返回，排行与领涨股仍可用</span></div>
+          </div>
+        `;
       }
       const series = points.filter((p) => typeof p.close === "number");
       if (series.length === 0) {
-        return `<svg class="spark" role="img" aria-label="无趋势数据"></svg>`;
+        return `
+          <div class="spark spark-empty" role="img" aria-label="无趋势数据">
+            <div>趋势数据暂缺<span>历史 K 线源未返回，排行与领涨股仍可用</span></div>
+          </div>
+        `;
       }
       const base = series[0].close || 1;
       const values = series.map((p) => ((p.close / base) - 1) * 100);
