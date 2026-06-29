@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>R02 盘面板块雷达</title>
+  <style>
+    :root {
+      --bg: #f5f3ee;
+      --panel: #fbfaf7;
+      --ink: #191a18;
+      --muted: #6f726b;
+      --line: #d8d3c7;
+      --red: #d64942;
+      --green: #159064;
+      --amber: #b98020;
+      --blue: #2c5d88;
+      --slate: #2d3439;
+      --shadow: 0 16px 40px rgba(35, 36, 33, 0.08);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(25, 26, 24, 0.035) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(25, 26, 24, 0.028) 1px, transparent 1px),
+        var(--bg);
+      background-size: 42px 42px;
+      color: var(--ink);
+      font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      min-height: 100vh;
+      letter-spacing: 0;
+    }
+
+    button, input, select { font: inherit; }
+
+    .shell {
+      width: min(1480px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 22px 0 30px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      border-bottom: 2px solid var(--ink);
+      padding-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 56px);
+      line-height: 0.92;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+      max-width: 860px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .icon-btn {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--ink);
+      background: var(--ink);
+      color: #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-grid;
+      place-items: center;
+      transition: transform 140ms ease, background 140ms ease;
+    }
+
+    .icon-btn:hover { transform: translateY(-1px); background: var(--slate); }
+    .icon-btn:disabled { opacity: 0.45; cursor: wait; transform: none; }
+
+    .statusline {
+      color: var(--muted);
+      font-size: 12px;
+      min-width: 230px;
+      text-align: right;
+    }
+
+    .layout {
+      display: grid;
+      gap: 18px;
+      margin-top: 18px;
+      align-items: start;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .section {
+      background: rgba(251, 250, 247, 0.92);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.42);
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 850;
+    }
+
+    .section-note {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .red { color: var(--red); }
+    .green { color: var(--green); }
+    .amber { color: var(--amber); }
+    .blue { color: var(--blue); }
+
+    .index-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      border-bottom: 1px solid var(--line);
+    }
+
+    .index-tile {
+      padding: 15px 14px 14px;
+      border-right: 1px solid var(--line);
+      min-height: 104px;
+    }
+
+    .index-tile:last-child { border-right: 0; }
+    .index-name { font-size: 13px; color: var(--muted); }
+    .index-price { margin-top: 8px; font-weight: 850; font-size: 22px; font-variant-numeric: tabular-nums; }
+    .index-pct { margin-top: 6px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    .market-rail {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0;
+      background: rgba(255, 255, 255, 0.24);
+    }
+
+    .rail-item {
+      padding: 12px 14px;
+      border-right: 1px solid var(--line);
+      min-height: 72px;
+    }
+
+    .rail-item:last-child { border-right: 0; }
+    .rail-label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .rail-value { margin-top: 6px; font-size: 23px; line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .rail-sub { margin-top: 6px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    th {
+      text-align: left;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.32);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(216, 211, 199, 0.75);
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .rank-badge {
+      width: 26px;
+      height: 26px;
+      display: inline-grid;
+      place-items: center;
+      background: var(--ink);
+      color: white;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .sector-name {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 112px;
+    }
+
+    .sector-name strong { font-size: 14px; }
+    .sector-name span { color: var(--muted); font-size: 11px; }
+
+    .spark {
+      width: 100%;
+      height: 230px;
+      display: block;
+    }
+
+    .spark .axis-line {
+      stroke: rgba(111, 114, 107, 0.58);
+      stroke-width: 1;
+    }
+
+    .spark .grid-line {
+      stroke: rgba(216, 211, 199, 0.82);
+      stroke-width: 1;
+      stroke-dasharray: 5 7;
+    }
+
+    .spark .axis-text {
+      fill: var(--muted);
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .spark .axis-title {
+      fill: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .trend-row td {
+      padding: 0;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .trend-panel {
+      padding: 14px 18px 18px 92px;
+      border-bottom: 1px solid rgba(216, 211, 199, 0.75);
+    }
+
+    .trend-panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .analysis-panel {
+      margin-top: 12px;
+      padding: 11px 12px;
+      border: 1px solid rgba(216, 211, 199, 0.9);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.34);
+    }
+
+    .analysis-title {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .analysis-text {
+      margin-bottom: 10px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .analysis-item {
+      min-width: 0;
+      border-top: 1px solid rgba(216, 211, 199, 0.85);
+      padding-top: 8px;
+    }
+
+    .analysis-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .analysis-value {
+      margin-top: 4px;
+      font-size: 13px;
+      font-weight: 850;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .analysis-note {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .leaders-panel {
+      margin-top: 13px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(216, 211, 199, 0.82);
+    }
+
+    .leaders-title {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .leaders-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .leader-chip {
+      min-width: 0;
+      padding: 8px 9px;
+      border: 1px solid rgba(216, 211, 199, 0.9);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.38);
+    }
+
+    .leader-topline {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+      font-size: 12px;
+      font-weight: 850;
+    }
+
+    .leader-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .leader-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .leaders-empty {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .r02-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    .r02-row {
+      display: grid;
+      grid-template-columns: minmax(96px, 1fr) 72px 72px 90px 68px;
+      gap: 8px;
+      padding: 10px 12px;
+      align-items: center;
+      border-bottom: 1px solid rgba(216, 211, 199, 0.75);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .r02-row:last-child { border-bottom: 0; }
+    .r02-row.head { color: var(--muted); font-size: 11px; font-weight: 800; background: rgba(255,255,255,0.32); }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .tag.hot { border-color: rgba(214,73,66,0.35); color: var(--red); background: rgba(214,73,66,0.06); }
+    .tag.main { border-color: rgba(44,93,136,0.38); color: var(--blue); background: rgba(44,93,136,0.06); }
+
+    .summary-box {
+      padding: 15px 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .summary-box p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.62;
+    }
+
+    .big-call {
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1.28;
+    }
+
+    .source-list {
+      padding: 12px 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+      word-break: break-word;
+    }
+
+    .warnings {
+      margin-top: 18px;
+      border: 1px solid rgba(185, 128, 32, 0.35);
+      background: rgba(185, 128, 32, 0.08);
+      color: #76500e;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      display: none;
+    }
+
+    .loading {
+      min-height: 280px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    @media (max-width: 1100px) {
+      .index-strip, .market-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .index-tile:nth-child(2n), .rail-item:nth-child(2n) { border-right: 0; }
+      .index-tile, .rail-item { border-bottom: 1px solid var(--line); }
+      .analysis-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .leaders-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 720px) {
+      .shell { width: min(100vw - 18px, 1480px); padding-top: 12px; }
+      .topbar { grid-template-columns: 1fr; align-items: start; }
+      .toolbar { justify-content: space-between; }
+      .statusline { text-align: left; min-width: 0; }
+      .index-strip, .market-rail { grid-template-columns: 1fr; }
+      .index-tile, .rail-item { border-right: 0; }
+      .section-head { align-items: flex-start; flex-direction: column; }
+      .section-note { white-space: normal; }
+      table { min-width: 760px; }
+      .table-wrap { overflow-x: auto; }
+      .spark { height: 190px; }
+      .trend-panel { padding-left: 58px; }
+      .analysis-grid { grid-template-columns: 1fr; }
+      .leaders-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .r02-row { grid-template-columns: minmax(96px, 1fr) 58px 58px 74px 58px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>R02 盘面板块雷达</h1>
+        <div class="subtitle">
+          实时行情看“今天钱往哪里打”，R02 宽度看“这条线有没有资格进入交易系统”。两者并排看，避免被单日加速带跑。
+        </div>
+      </div>
+      <div class="toolbar">
+        <button class="icon-btn" id="refreshBtn" title="刷新数据" aria-label="刷新数据">↻</button>
+        <div class="statusline" id="statusLine">等待数据...</div>
+      </div>
+    </header>
+
+    <div id="app" class="loading">正在拉取盘面与板块数据...</div>
+    <div id="warnings" class="warnings"></div>
+  </main>
+
+  <script>
+    const app = document.getElementById("app");
+    const refreshBtn = document.getElementById("refreshBtn");
+    const statusLine = document.getElementById("statusLine");
+    const warningsBox = document.getElementById("warnings");
+
+    const fmt = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+    const fmt0 = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 });
+
+    function clsPct(value) {
+      if (value == null) return "";
+      return value >= 0 ? "red" : "green";
+    }
+
+    function signed(value, suffix = "%") {
+      if (value == null || Number.isNaN(value)) return "--";
+      const sign = value > 0 ? "+" : "";
+      return `${sign}${fmt.format(value)}${suffix}`;
+    }
+
+    function plain(value, suffix = "") {
+      if (value == null || Number.isNaN(value)) return "--";
+      return `${fmt.format(value)}${suffix}`;
+    }
+
+    function moneyYi(value) {
+      if (value == null || Number.isNaN(value)) return "--";
+      return `${fmt.format(value)} 亿`;
+    }
+
+    function escapeHtml(text) {
+      return String(text ?? "").replace(/[&<>"']/g, (m) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[m]));
+    }
+
+    function shortDate(value) {
+      const parts = String(value || "").split("-");
+      if (parts.length === 3) return `${Number(parts[1])}/${Number(parts[2])}`;
+      return String(value || "").slice(-5);
+    }
+
+    function sparkline(points, color) {
+      if (!points || points.length === 0) {
+        return `<svg class="spark" role="img" aria-label="无趋势数据"></svg>`;
+      }
+      const series = points.filter((p) => typeof p.close === "number");
+      if (series.length === 0) {
+        return `<svg class="spark" role="img" aria-label="无趋势数据"></svg>`;
+      }
+      const base = series[0].close || 1;
+      const values = series.map((p) => ((p.close / base) - 1) * 100);
+      const rawMin = Math.min(0, ...values);
+      const rawMax = Math.max(0, ...values);
+      const rawSpan = rawMax - rawMin;
+      const valuePad = rawSpan ? rawSpan * 0.12 : 0.8;
+      const min = rawMin - valuePad;
+      const max = rawMax + valuePad;
+      const span = max - min || 1;
+      const width = 980;
+      const height = 230;
+      const left = 64;
+      const right = 18;
+      const top = 20;
+      const bottom = 42;
+      const chartW = width - left - right;
+      const chartH = height - top - bottom;
+      const baseY = top + chartH;
+      const step = series.length > 1 ? chartW / (series.length - 1) : 0;
+      const yFor = (value) => baseY - ((value - min) / span) * chartH;
+      const coords = values.map((v, i) => {
+        const x = left + i * step;
+        const y = yFor(v);
+        return [x, y];
+      });
+      const line = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+      const zeroY = yFor(0);
+      const area = `${left},${zeroY.toFixed(1)} ${line} ${width - right},${zeroY.toFixed(1)}`;
+      const dots = coords.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4"></circle>`).join("");
+      const yTicks = [rawMax, rawMax > 0 && rawMin < 0 ? 0 : (rawMax + rawMin) / 2, rawMin]
+        .filter((value, index, arr) => arr.findIndex((v) => Math.abs(v - value) < 0.01) === index)
+        .map((value) => {
+        const y = yFor(value);
+        return `
+          <line class="grid-line" x1="${left}" y1="${y.toFixed(1)}" x2="${width - right}" y2="${y.toFixed(1)}"></line>
+          <text class="axis-text" x="${left - 9}" y="${(y + 4).toFixed(1)}" text-anchor="end">${signed(value)}</text>
+        `;
+      }).join("");
+      const xTicks = series.map((point, i) => {
+        const x = left + i * step;
+        return `
+          <line class="axis-line" x1="${x.toFixed(1)}" y1="${baseY}" x2="${x.toFixed(1)}" y2="${baseY + 5}"></line>
+          <text class="axis-text" x="${x.toFixed(1)}" y="${height - 12}" text-anchor="middle">${escapeHtml(shortDate(point.date))}</text>
+        `;
+      }).join("");
+      return `
+        <svg class="spark" viewBox="0 0 ${width} ${height}" role="img" aria-label="10日相对涨幅趋势">
+          <text class="axis-title" x="${left}" y="13">相对首日涨幅</text>
+          ${yTicks}
+          <line class="axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${baseY}"></line>
+          <line class="axis-line" x1="${left}" y1="${baseY}" x2="${width - right}" y2="${baseY}"></line>
+          <line class="axis-line" x1="${left}" y1="${zeroY.toFixed(1)}" x2="${width - right}" y2="${zeroY.toFixed(1)}"></line>
+          ${xTicks}
+          <polyline points="${area}" fill="${color}" opacity="0.09"></polyline>
+          <polyline points="${line}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          <g fill="${color}">${dots}</g>
+        </svg>
+      `;
+    }
+
+    function renderIndices(indices) {
+      return indices.map((item) => `
+        <div class="index-tile">
+          <div class="index-name">${escapeHtml(item.name)} · ${escapeHtml(item.code)}</div>
+          <div class="index-price">${plain(item.price, "")}</div>
+          <div class="index-pct ${clsPct(item.pct)}">${signed(item.pct)}</div>
+        </div>
+      `).join("");
+    }
+
+    function renderLeaders(leaders) {
+      if (!leaders || leaders.length === 0) {
+        return `<div class="leaders-empty">暂无成分股排行</div>`;
+      }
+      return `
+        <div class="leaders-grid">
+          ${leaders.map((stock) => `
+            <div class="leader-chip">
+              <div class="leader-topline">
+                <span class="leader-name">${stock.rank}. ${escapeHtml(stock.name)}</span>
+                <span class="${clsPct(stock.pct)}">${signed(stock.pct)}</span>
+              </div>
+              <div class="leader-meta">${escapeHtml(stock.code)} · ${plain(stock.price)} · ${moneyYi(stock.amountYi)}</div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function avg(values) {
+      const clean = values.filter((value) => typeof value === "number" && !Number.isNaN(value));
+      if (clean.length === 0) return null;
+      return clean.reduce((sum, value) => sum + value, 0) / clean.length;
+    }
+
+    function trendStats(points) {
+      const series = (points || []).filter((p) => typeof p.close === "number");
+      if (series.length < 2) {
+        return { total: null, last3: null, position: "趋势数据不足" };
+      }
+      const base = series[0].close || 1;
+      const rel = series.map((p) => ((p.close / base) - 1) * 100);
+      const total = rel[rel.length - 1];
+      const high = Math.max(...rel);
+      const low = Math.min(...rel);
+      const last3 = series.slice(-3).reduce((sum, p) => sum + (p.pct || 0), 0);
+      let position = "区间震荡";
+      if (total >= high - 0.25 && total > 0) position = "收在10日高位";
+      else if (total > 0 && last3 < 0) position = "高位回撤后仍强";
+      else if (total > 0) position = "10日仍为正收益";
+      else if (total <= low + 0.25) position = "仍在10日低位";
+      return { total, last3, position };
+    }
+
+    function renderAttribution(sector, trend) {
+      const leaders = sector.leaders10 || [];
+      const top3 = leaders.slice(0, 3);
+      const totalStocks = (sector.upCount || 0) + (sector.downCount || 0);
+      const upRatio = totalStocks ? (sector.upCount / totalStocks) * 100 : null;
+      const top3Avg = avg(top3.map((stock) => stock.pct));
+      const limitLike = leaders.filter((stock) => (stock.pct || 0) >= 19.5).length;
+      const stats = trendStats(trend);
+
+      let breadthNote = "成分股数据不足";
+      if (upRatio != null && upRatio >= 88) breadthNote = "板块普涨，扩散很强";
+      else if (upRatio != null && upRatio >= 70) breadthNote = "多数跟涨，扩散尚可";
+      else if (upRatio != null) breadthNote = "上涨偏集中，先防分化";
+
+      let leaderNote = "龙头数据不足";
+      if (leaders[0]) {
+        leaderNote = limitLike >= 2 ? `${limitLike} 只接近20%，高弹明显` : `前三均值 ${signed(top3Avg)}`;
+      }
+
+      let amountNote = "成交额待观察";
+      if ((sector.amountYi || 0) >= 200) amountNote = "成交活跃，资金确认度高";
+      else if ((sector.amountYi || 0) >= 80) amountNote = "成交中等，需看延续";
+      else if (sector.amountYi != null) amountNote = "成交偏轻，持续性要打问号";
+
+      const reasons = [];
+      if (upRatio != null && upRatio >= 70) reasons.push("上涨家数覆盖面够");
+      if ((sector.leaderPct || 0) >= Math.max((sector.pct || 0) + 6, 12)) reasons.push("龙头强度高于板块");
+      if (stats.total != null && stats.total > 0 && stats.last3 != null && stats.last3 > 0) reasons.push("10日相对趋势抬升");
+      if ((sector.amountYi || 0) >= 80) reasons.push("成交额有配合");
+      if (reasons.length === 0) reasons.push("更多是短线弹性，先看明日扩散");
+
+      return `
+        <div class="analysis-panel">
+          <div class="analysis-title">归因分析</div>
+          <div class="analysis-text">主因：${escapeHtml(reasons.slice(0, 3).join(" + "))}。</div>
+          <div class="analysis-grid">
+            <div class="analysis-item">
+              <div class="analysis-label">扩散</div>
+              <div class="analysis-value">${sector.upCount}涨 / ${sector.downCount}跌</div>
+              <div class="analysis-note">${escapeHtml(breadthNote)}</div>
+            </div>
+            <div class="analysis-item">
+              <div class="analysis-label">龙头</div>
+              <div class="analysis-value">${escapeHtml(leaders[0]?.name || sector.leader || "--")} <span class="${clsPct(leaders[0]?.pct ?? sector.leaderPct)}">${signed(leaders[0]?.pct ?? sector.leaderPct)}</span></div>
+              <div class="analysis-note">${escapeHtml(leaderNote)}</div>
+            </div>
+            <div class="analysis-item">
+              <div class="analysis-label">10日相对趋势</div>
+              <div class="analysis-value ${clsPct(stats.total)}">${signed(stats.total)}</div>
+              <div class="analysis-note">${escapeHtml(stats.position)} · 近3日 ${signed(stats.last3)}</div>
+            </div>
+            <div class="analysis-item">
+              <div class="analysis-label">成交</div>
+              <div class="analysis-value">${moneyYi(sector.amountYi)}</div>
+              <div class="analysis-note">${escapeHtml(amountNote)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function marketTone(distribution) {
+      if (!distribution || distribution.upPct == null) return "数据不足";
+      if (distribution.upPct >= 60 && distribution.median > 0) return "红灯转黄，赚钱效应扩散";
+      if (distribution.upPct >= 45) return "分歧盘，适合等收敛";
+      if (distribution.upPct >= 30) return "弱修复，重防守";
+      return "冷盘，先看风险";
+    }
+
+    function renderTop5(sectors) {
+      return sectors.map((sector) => {
+        const color = sector.pct >= 0 ? "var(--red)" : "var(--green)";
+        const trend = sector.trend10 || sector.trend5 || [];
+        return `
+          <tr class="sector-main-row">
+            <td><span class="rank-badge">${sector.rank}</span></td>
+            <td>
+              <div class="sector-name">
+                <strong>${escapeHtml(sector.name)}</strong>
+                <span>${escapeHtml(sector.code)} · 领涨 ${escapeHtml(sector.leader)}</span>
+              </div>
+            </td>
+            <td class="${clsPct(sector.pct)}"><strong>${signed(sector.pct)}</strong></td>
+            <td>${plain(sector.price)}</td>
+            <td>${moneyYi(sector.amountYi)}</td>
+            <td>${sector.upCount} / ${sector.downCount}</td>
+            <td class="${clsPct(sector.leaderPct)}">${signed(sector.leaderPct)}</td>
+          </tr>
+          <tr class="trend-row">
+            <td colspan="7">
+              <div class="trend-panel">
+                <div class="trend-panel-head">
+                  <span>${escapeHtml(sector.name)} · 10日相对趋势</span>
+                  <span>以第1日收盘为0%，最近 ${trend.length || "--"} 个交易日</span>
+                </div>
+                ${sparkline(trend, color)}
+                ${renderAttribution(sector, trend)}
+                <div class="leaders-panel">
+                  <div class="leaders-title">板块内领涨 10 股</div>
+                  ${renderLeaders(sector.leaders10)}
+                </div>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderSectors(sectors) {
+      return sectors.slice(0, 15).map((sector) => `
+        <tr>
+          <td>${sector.rank}</td>
+          <td>${escapeHtml(sector.name)} <span style="color:var(--muted)">(${escapeHtml(sector.code)})</span></td>
+          <td class="${clsPct(sector.pct)}">${signed(sector.pct)}</td>
+          <td>${plain(sector.amplitude, "%")}</td>
+          <td>${moneyYi(sector.amountYi)}</td>
+          <td>${sector.upCount}涨 / ${sector.downCount}跌</td>
+          <td>${escapeHtml(sector.leader)} <span class="${clsPct(sector.leaderPct)}">${signed(sector.leaderPct)}</span></td>
+        </tr>
+      `).join("");
+    }
+
+    function renderR02(breadth, r02) {
+      const rows = (breadth.rows || []).slice(0, 10);
+      return `
+        <div class="r02-grid">
+          <div class="r02-row head">
+            <div>行业</div><div>最新</div><div>5日均</div><div>70+天数</div><div>斜率</div>
+          </div>
+          ${rows.map((row) => `
+            <div class="r02-row">
+              <div>
+                ${escapeHtml(row.industry)}
+                ${row.isCurrentR02 ? `<span class="tag main">R02</span>` : ""}
+              </div>
+              <div class="${row.latest >= 70 ? "red" : row.latest < 40 ? "green" : ""}">${plain(row.latest)}</div>
+              <div class="${row.avg5 >= 70 ? "red" : ""}">${plain(row.avg5)}</div>
+              <div>${row.days70}/${row.daysTotal}</div>
+              <div class="${row.slope5 >= 0 ? "red" : "green"}">${signed(row.slope5, "")}</div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function render(data) {
+      const dist = data.marketDistribution || {};
+      const top1 = data.top5?.[0];
+      const topNames = (data.top5 || []).map((s) => s.name).join(" / ");
+      const r02Date = data.r02Breadth?.dateEnd || "--";
+      const hotMatchesR02 = (data.top5 || []).filter((s) => [data.r02.primary, data.r02.secondary].includes(s.name));
+
+      app.className = "";
+      app.innerHTML = `
+        <div class="layout">
+          <div class="stack">
+            <section class="section">
+              <div class="section-head">
+                <h2 class="section-title">综合判断</h2>
+                <span class="section-note">R02 更新 ${escapeHtml(data.r02.updated)} · 宽度至 ${escapeHtml(r02Date)}</span>
+              </div>
+              <div class="summary-box">
+                <div class="big-call">${escapeHtml(marketTone(dist))}</div>
+                <p>今日板块领涨：<strong>${escapeHtml(topNames || "--")}</strong>。${hotMatchesR02.length ? "领涨板块命中当前 R02 主线，值得继续做 R03/R04 复核。" : "领涨板块暂未直接命中当前 R02 主线，先按盘中强弱观察，不自动放宽交易权限。"}</p>
+                <p>当前正式 R02：<span class="tag main">${escapeHtml(data.r02.primary)}</span> <span class="tag main">${escapeHtml(data.r02.secondary)}</span>。${escapeHtml(data.r02.note)}</p>
+              </div>
+            </section>
+          </div>
+
+          <div class="stack">
+            <section class="section">
+              <div class="section-head">
+                <h2 class="section-title">主要指数与盘面温度</h2>
+                <span class="section-note">A股 3 个 + 美股 / 港股，各一条</span>
+              </div>
+              <div class="index-strip">${renderIndices(data.indices || [])}</div>
+              <div class="market-rail">
+                <div class="rail-item">
+                  <div class="rail-label">上涨占比 · A股</div>
+                  <div class="rail-value ${dist.upPct >= 50 ? "red" : "green"}">${plain(dist.upPct, "%")}</div>
+                  <div class="rail-sub">样本 ${dist.n ? fmt0.format(dist.n) : "--"} 只</div>
+                </div>
+                <div class="rail-item">
+                  <div class="rail-label">涨跌幅中位数</div>
+                  <div class="rail-value ${clsPct(dist.median)}">${signed(dist.median)}</div>
+                  <div class="rail-sub">P25 ${signed(dist.p25)} / P75 ${signed(dist.p75)}</div>
+                </div>
+                <div class="rail-item">
+                  <div class="rail-label">领涨板块</div>
+                  <div class="rail-value ${clsPct(top1?.pct)}">${signed(top1?.pct)}</div>
+                  <div class="rail-sub">${escapeHtml(top1?.name || "--")}</div>
+                </div>
+                <div class="rail-item">
+                  <div class="rail-label">Top5 平均涨幅</div>
+                  <div class="rail-value red">${signed((data.top5 || []).reduce((a, s) => a + (s.pct || 0), 0) / Math.max((data.top5 || []).length, 1))}</div>
+                  <div class="rail-sub">按板块指数 f3 排序</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <h2 class="section-title">前 5 名板块指数与 10 日趋势</h2>
+                <span class="section-note">按实时涨跌幅排序，趋势按首日收盘归一化</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>排</th><th>板块</th><th>今日</th><th>板块点位</th><th>成交额</th><th>涨/跌</th><th>领涨股</th>
+                    </tr>
+                  </thead>
+                  <tbody>${renderTop5(data.top5 || [])}</tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <h2 class="section-title">板块排行扩展</h2>
+                <span class="section-note">前 15 名，辅助观察扩散强度</span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>排名</th><th>板块</th><th>涨跌幅</th><th>振幅</th><th>成交额</th><th>上涨/下跌</th><th>领涨股</th>
+                    </tr>
+                  </thead>
+                  <tbody>${renderSectors(data.sectors || [])}</tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <h2 class="section-title">数据源</h2>
+              </div>
+              <div class="source-list">
+                <div>指数：${escapeHtml(data.source.indices)}</div>
+                <div>板块排行：${escapeHtml(data.source.sectorRank)}</div>
+                <div>10日趋势：${escapeHtml(data.source.sectorKline)}</div>
+                <div>领涨10股：${escapeHtml(data.source.sectorLeaders)}</div>
+                <div>市场分布：${escapeHtml(data.source.marketDistribution)}</div>
+              </div>
+            </section>
+
+            <section class="section">
+              <div class="section-head">
+                <h2 class="section-title">R02 宽度校验</h2>
+                <span class="section-note">${escapeHtml(data.r02Breadth?.dateStart || "--")} → ${escapeHtml(r02Date)}</span>
+              </div>
+              ${renderR02(data.r02Breadth || { rows: [] }, data.r02)}
+            </section>
+          </div>
+        </div>
+      `;
+
+      const generated = new Date(data.generatedAt);
+      statusLine.textContent = `更新 ${generated.toLocaleTimeString("zh-CN", { hour12: false })} · 缓存 ${data.cacheAgeSeconds || 0}s / ${data.cacheTtlSeconds}s`;
+
+      if (data.warnings && data.warnings.length) {
+        warningsBox.style.display = "block";
+        warningsBox.innerHTML = data.warnings.map(escapeHtml).join("<br>");
+      } else {
+        warningsBox.style.display = "none";
+        warningsBox.textContent = "";
+      }
+    }
+
+    async function load(force = false) {
+      refreshBtn.disabled = true;
+      statusLine.textContent = force ? "正在强制刷新..." : "正在更新...";
+      try {
+        const response = await fetch(`/api/dashboard${force ? "?force=1" : ""}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        render(data);
+      } catch (error) {
+        app.className = "loading";
+        app.textContent = `数据拉取失败：${error.message}`;
+        statusLine.textContent = "更新失败";
+      } finally {
+        refreshBtn.disabled = false;
+      }
+    }
+
+    refreshBtn.addEventListener("click", () => load(true));
+    load(true);
+    setInterval(() => load(false), 60000);
+  </script>
+</body>
+</html>
