@@ -159,6 +159,36 @@ def get_sector_rank(limit: int = 20) -> list[dict[str, Any]]:
     return sectors
 
 
+def build_sector_rank_status(sectors: list[dict[str, Any]]) -> dict[str, Any]:
+    if not sectors:
+        return {
+            "ready": False,
+            "reason": "empty",
+            "message": "板块排行暂无数据，等待实时行情源返回。",
+        }
+
+    has_intraday_snapshot = any(
+        (sector.get("amountYi") is not None and sector.get("amountYi") > 0)
+        or ((sector.get("upCount") or 0) + (sector.get("downCount") or 0) > 0)
+        or sector.get("leaderPct") is not None
+        or (sector.get("leader") not in (None, "", "-", "--") and sector.get("leaderCode"))
+        or (sector.get("pct") not in (None, 0))
+        or (sector.get("amplitude") not in (None, 0))
+        for sector in sectors[:15]
+    )
+    if has_intraday_snapshot:
+        return {
+            "ready": True,
+            "reason": "ok",
+            "message": "板块排行已更新。",
+        }
+    return {
+        "ready": False,
+        "reason": "not_started",
+        "message": "东方财富板块实时报价尚未开始更新；盘前排行不具备参考意义。",
+    }
+
+
 def get_sector_leaders(code: str, limit: int = 10) -> list[dict[str, Any]]:
     fields = "f12,f14,f2,f3,f4,f6,f7,f8,f10,f20,f21,f23"
     url = (
@@ -354,6 +384,11 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
     market_distribution: dict[str, Any] = {}
     r02_breadth: dict[str, Any] = {}
     sectors: list[dict[str, Any]] = []
+    sector_rank_status = {
+        "ready": False,
+        "reason": "pending",
+        "message": "板块排行等待更新。",
+    }
 
     def read_future(
         label: str,
@@ -381,8 +416,9 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
         )
         r02_breadth = read_future("r02Breadth", base_futures["r02Breadth"], {})
         sectors = read_future("sectorRank", base_futures["sectorRank"], [])
+        sector_rank_status = build_sector_rank_status(sectors)
 
-    top_sectors = sectors[:5]
+    top_sectors = sectors[:5] if sector_rank_status["ready"] else []
     if top_sectors:
         detail_workers = min(API_WORKERS, max(1, len(top_sectors)))
         with concurrent.futures.ThreadPoolExecutor(max_workers=detail_workers) as executor:
@@ -456,9 +492,10 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
         "r02": R02_CURRENT,
         "indices": indices,
         "marketDistribution": market_distribution,
+        "sectorRankStatus": sector_rank_status,
         "r02Breadth": r02_breadth,
         "sectors": sectors,
-        "top5": sectors[:5],
+        "top5": top_sectors,
         "warnings": warnings,
     }
     _cache["ts"] = now

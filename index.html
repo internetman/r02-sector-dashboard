@@ -181,6 +181,22 @@
     .rail-value { margin-top: 6px; font-size: 23px; line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; }
     .rail-sub { margin-top: 6px; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+    .data-notice {
+      padding: 26px 18px;
+      border-top: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.32);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .data-notice strong {
+      display: block;
+      color: var(--ink);
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -905,6 +921,15 @@
       `).join("");
     }
 
+    function renderDataNotice(title, message) {
+      return `
+        <div class="data-notice">
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(message)}</span>
+        </div>
+      `;
+    }
+
     function renderR02(breadth, r02) {
       const rows = (breadth.rows || []).slice(0, 10);
       return `
@@ -931,10 +956,20 @@
     function render(data) {
       hydrateTrendCache(data);
       const dist = data.marketDistribution || {};
-      const top1 = data.top5?.[0];
-      const topNames = (data.top5 || []).map((s) => s.name).join(" / ");
+      const sectorRankStatus = data.sectorRankStatus || { ready: true, message: "板块排行已更新。" };
+      const sectorRankReady = sectorRankStatus.ready !== false;
+      const visibleTop5 = sectorRankReady ? (data.top5 || []) : [];
+      const visibleSectors = sectorRankReady ? (data.sectors || []) : [];
+      const top1 = visibleTop5[0];
+      const topNames = visibleTop5.map((s) => s.name).join(" / ");
       const r02Date = data.r02Breadth?.dateEnd || "--";
-      const hotMatchesR02 = (data.top5 || []).filter((s) => [data.r02.primary, data.r02.secondary].includes(s.name));
+      const hotMatchesR02 = visibleTop5.filter((s) => [data.r02.primary, data.r02.secondary].includes(s.name));
+      const sectorSummary = sectorRankReady
+        ? `今日板块领涨：<strong>${escapeHtml(topNames || "--")}</strong>。${hotMatchesR02.length ? "领涨板块命中当前 R02 主线，值得继续做 R03/R04 复核。" : "领涨板块暂未直接命中当前 R02 主线，先按盘中强弱观察，不自动放宽交易权限。"}`
+        : `板块排行：<strong>未就绪</strong>。${escapeHtml(sectorRankStatus.message || "等待实时行情源更新。")}`;
+      const top5Avg = visibleTop5.length
+        ? visibleTop5.reduce((a, s) => a + (s.pct || 0), 0) / visibleTop5.length
+        : null;
 
       app.className = "";
       app.innerHTML = `
@@ -947,7 +982,7 @@
               </div>
               <div class="summary-box">
                 <div class="big-call">${escapeHtml(marketTone(dist))}</div>
-                <p>今日板块领涨：<strong>${escapeHtml(topNames || "--")}</strong>。${hotMatchesR02.length ? "领涨板块命中当前 R02 主线，值得继续做 R03/R04 复核。" : "领涨板块暂未直接命中当前 R02 主线，先按盘中强弱观察，不自动放宽交易权限。"}</p>
+                <p>${sectorSummary}</p>
                 <p>当前 R02 摘要：<span class="tag main">${escapeHtml(data.r02.primary)}</span> <span class="tag main">${escapeHtml(data.r02.secondary)}</span>。${escapeHtml(data.r02.note)}</p>
               </div>
             </section>
@@ -978,8 +1013,8 @@
                 </div>
                 <div class="rail-item">
                   <div class="rail-label">Top5 平均涨幅</div>
-                  <div class="rail-value red">${signed((data.top5 || []).reduce((a, s) => a + (s.pct || 0), 0) / Math.max((data.top5 || []).length, 1))}</div>
-                  <div class="rail-sub">按板块指数 f3 排序</div>
+                  <div class="rail-value ${clsPct(top5Avg)}">${signed(top5Avg)}</div>
+                  <div class="rail-sub">${sectorRankReady ? "按板块指数 f3 排序" : "等待板块行情"}</div>
                 </div>
               </div>
             </section>
@@ -989,16 +1024,16 @@
                 <h2 class="section-title">前 5 名板块指数与 10 日趋势</h2>
                 <span class="section-note">按实时涨跌幅排序，趋势按首日收盘归一化</span>
               </div>
-              <div class="table-wrap">
+              ${sectorRankReady ? `<div class="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>排</th><th>板块</th><th>今日</th><th>板块点位</th><th>成交额</th><th>涨/跌</th><th>领涨股</th>
                     </tr>
                   </thead>
-                  <tbody>${renderTop5(data.top5 || [])}</tbody>
+                  <tbody>${renderTop5(visibleTop5)}</tbody>
                 </table>
-              </div>
+              </div>` : renderDataNotice("板块排行未开始更新", sectorRankStatus.message || "等待实时行情源更新。")}
             </section>
 
             <section class="section">
@@ -1006,16 +1041,16 @@
                 <h2 class="section-title">板块排行扩展</h2>
                 <span class="section-note">前 15 名，辅助观察扩散强度</span>
               </div>
-              <div class="table-wrap">
+              ${sectorRankReady ? `<div class="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>排名</th><th>板块</th><th>涨跌幅</th><th>振幅</th><th>成交额</th><th>上涨/下跌</th><th>领涨股</th>
                     </tr>
                   </thead>
-                  <tbody>${renderSectors(data.sectors || [])}</tbody>
+                  <tbody>${renderSectors(visibleSectors)}</tbody>
                 </table>
-              </div>
+              </div>` : renderDataNotice("扩展排行暂不展示", "当前快照全为 0，成交额、涨跌家数和领涨股均未更新；显示为排行会误导判断。")}
             </section>
 
             <section class="section">
