@@ -566,6 +566,8 @@
     const statusLine = document.getElementById("statusLine");
     const warningsBox = document.getElementById("warnings");
     const TREND_CACHE_KEY = "r02-sector-dashboard:trend-cache:v1";
+    const SECTOR_RANK_CACHE_KEY = "r02-sector-dashboard:sector-rank-cache:v1";
+    const SECTOR_RANK_BROWSER_CACHE_MAX_AGE_SECONDS = 900;
     let hasRendered = false;
 
     const fmt = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
@@ -634,6 +636,61 @@
       } catch {
         // Browser storage is a convenience cache; ignore quota/private-mode failures.
       }
+    }
+
+    function readSectorRankCache() {
+      try {
+        return JSON.parse(localStorage.getItem(SECTOR_RANK_CACHE_KEY) || "null");
+      } catch {
+        return null;
+      }
+    }
+
+    function writeSectorRankCache(cache) {
+      try {
+        localStorage.setItem(SECTOR_RANK_CACHE_KEY, JSON.stringify(cache));
+      } catch {
+        // Browser storage is a convenience cache; ignore quota/private-mode failures.
+      }
+    }
+
+    function hydrateSectorRankCache(data) {
+      data.warnings = Array.isArray(data.warnings) ? data.warnings : [];
+      const status = data.sectorRankStatus || {};
+      const now = Date.now();
+      const sectors = data.sectors || [];
+      const top5 = data.top5 || [];
+
+      if (status.ready !== false && sectors.length && top5.length) {
+        const updatedAt = status.updatedAt || status.cachedAt || data.generatedAt || new Date().toISOString();
+        const savedAt = Date.parse(updatedAt) || now;
+        writeSectorRankCache({
+          savedAt,
+          updatedAt,
+          sectors,
+          top5
+        });
+        return;
+      }
+
+      const cached = readSectorRankCache();
+      if (!cached || !Array.isArray(cached.sectors) || !cached.sectors.length) return;
+      const ageSeconds = Math.round((now - (cached.savedAt || 0)) / 1000);
+      if (ageSeconds > SECTOR_RANK_BROWSER_CACHE_MAX_AGE_SECONDS) return;
+
+      data.sectors = cached.sectors;
+      data.top5 = cached.top5 || cached.sectors.slice(0, 5);
+      data.sectorRankStatus = {
+        ready: true,
+        reason: `browser-cache-after-${status.reason || "missing"}`,
+        message: "沿用上一次成功板块排行。",
+        cached: true,
+        cachedAt: cached.updatedAt,
+        cacheAgeSeconds: ageSeconds,
+        fallbackReason: status.reason || "missing",
+        fallbackMessage: status.message || "本次板块排行刷新失败。"
+      };
+      data.warnings.push(`sectorRank ${data.sectorRankStatus.fallbackReason}; using browser cached rank from ${cached.updatedAt}`);
     }
 
     function hydrateTrendCache(data) {
@@ -954,10 +1011,15 @@
     }
 
     function render(data) {
+      hydrateSectorRankCache(data);
       hydrateTrendCache(data);
       const dist = data.marketDistribution || {};
       const sectorRankStatus = data.sectorRankStatus || { ready: true, message: "板块排行已更新。" };
       const sectorRankReady = sectorRankStatus.ready !== false;
+      const sectorRankCached = !!sectorRankStatus.cached;
+      const sectorRankCacheText = sectorRankCached
+        ? `沿用上次排行 ${shortDateTime(sectorRankStatus.cachedAt)}`
+        : "";
       const visibleTop5 = sectorRankReady ? (data.top5 || []) : [];
       const visibleSectors = sectorRankReady ? (data.sectors || []) : [];
       const top1 = visibleTop5[0];
@@ -965,7 +1027,7 @@
       const r02Date = data.r02Breadth?.dateEnd || "--";
       const hotMatchesR02 = visibleTop5.filter((s) => [data.r02.primary, data.r02.secondary].includes(s.name));
       const sectorSummary = sectorRankReady
-        ? `今日板块领涨：<strong>${escapeHtml(topNames || "--")}</strong>。${hotMatchesR02.length ? "领涨板块命中当前 R02 主线，值得继续做 R03/R04 复核。" : "领涨板块暂未直接命中当前 R02 主线，先按盘中强弱观察，不自动放宽交易权限。"}`
+        ? `今日板块领涨：<strong>${escapeHtml(topNames || "--")}</strong>${sectorRankCached ? `（${escapeHtml(sectorRankCacheText)}）` : ""}。${hotMatchesR02.length ? "领涨板块命中当前 R02 主线，值得继续做 R03/R04 复核。" : "领涨板块暂未直接命中当前 R02 主线，先按盘中强弱观察，不自动放宽交易权限。"}`
         : `板块排行：<strong>未就绪</strong>。${escapeHtml(sectorRankStatus.message || "等待实时行情源更新。")}`;
       const sectorNoticeDetail = sectorRankStatus.reason === "source_error"
         ? "东方财富实时板块接口暂时失败；页面保留指数、全市场温度和 R02 宽度模块，等待下一次刷新。"
@@ -1017,7 +1079,7 @@
                 <div class="rail-item">
                   <div class="rail-label">Top5 平均涨幅</div>
                   <div class="rail-value ${clsPct(top5Avg)}">${signed(top5Avg)}</div>
-                  <div class="rail-sub">${sectorRankReady ? "按板块指数 f3 排序" : "等待板块行情"}</div>
+                  <div class="rail-sub">${sectorRankReady ? (sectorRankCached ? escapeHtml(sectorRankCacheText) : "按板块指数 f3 排序") : "等待板块行情"}</div>
                 </div>
               </div>
             </section>
@@ -1025,7 +1087,7 @@
             <section class="section">
               <div class="section-head">
                 <h2 class="section-title">前 5 名板块指数与 10 日趋势</h2>
-                <span class="section-note">按实时涨跌幅排序，趋势按首日收盘归一化</span>
+                <span class="section-note">按实时涨跌幅排序，趋势按首日收盘归一化${sectorRankCached ? ` · ${escapeHtml(sectorRankCacheText)}` : ""}</span>
               </div>
               ${sectorRankReady ? `<div class="table-wrap">
                 <table>
@@ -1042,7 +1104,7 @@
             <section class="section">
               <div class="section-head">
                 <h2 class="section-title">板块排行扩展</h2>
-                <span class="section-note">前 15 名，辅助观察扩散强度</span>
+                <span class="section-note">前 15 名，辅助观察扩散强度${sectorRankCached ? ` · ${escapeHtml(sectorRankCacheText)}` : ""}</span>
               </div>
               ${sectorRankReady ? `<div class="table-wrap">
                 <table>

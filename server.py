@@ -26,6 +26,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent
 CACHE_TTL_SECONDS = 45
 TREND_CACHE_TTL_SECONDS = int(os.environ.get("R02_TREND_CACHE_TTL_SECONDS", "1800"))
+SECTOR_RANK_CACHE_MAX_AGE_SECONDS = int(
+    os.environ.get("R02_SECTOR_RANK_CACHE_MAX_AGE_SECONDS", "900")
+)
 FETCH_TIMEOUT_SECONDS = float(os.environ.get("R02_FETCH_TIMEOUT_SECONDS", "4"))
 API_WORKERS = int(os.environ.get("R02_API_WORKERS", "12"))
 
@@ -49,6 +52,7 @@ R02_CURRENT = {
 
 _cache: dict[str, Any] = {"ts": 0.0, "payload": None}
 _trend_cache: dict[str, dict[str, Any]] = {}
+_sector_rank_cache: dict[str, Any] = {"ts": 0.0, "updatedAt": None, "rows": []}
 
 
 class FetchError(RuntimeError):
@@ -300,6 +304,33 @@ def store_trend_cache(code: str, trend: list[dict[str, Any]], now: float) -> str
     return updated_at
 
 
+def store_sector_rank_cache(sectors: list[dict[str, Any]], now: float) -> str:
+    updated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    _sector_rank_cache["ts"] = now
+    _sector_rank_cache["updatedAt"] = updated_at
+    _sector_rank_cache["rows"] = clone_rows(sectors)
+    return updated_at
+
+
+def apply_sector_rank_cache(
+    now: float,
+    reason: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any]] | None:
+    rows = _sector_rank_cache.get("rows") or []
+    ts = float(_sector_rank_cache.get("ts") or 0)
+    if not rows or now - ts > SECTOR_RANK_CACHE_MAX_AGE_SECONDS:
+        return None
+    updated_at = _sector_rank_cache.get("updatedAt")
+    return clone_rows(rows), {
+        "ready": True,
+        "reason": reason,
+        "message": "沿用上一次成功板块排行。",
+        "cached": True,
+        "cachedAt": updated_at,
+        "cacheAgeSeconds": round(now - ts),
+    }
+
+
 def summarize_map_param(payload: dict[str, Any]) -> dict[str, Any]:
     values = []
     data = payload.get("data")
@@ -434,6 +465,25 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
         else:
             sector_rank_error = None
         sector_rank_status = build_sector_rank_status(sectors, sector_rank_error)
+        if sector_rank_status["ready"]:
+            sector_rank_status["cached"] = False
+            sector_rank_status["updatedAt"] = store_sector_rank_cache(sectors, now)
+        else:
+            cached_rank = apply_sector_rank_cache(
+                now,
+                f"server-cache-after-{sector_rank_status['reason']}",
+            )
+            if cached_rank:
+                sectors, cached_status = cached_rank
+                cached_status["fallbackReason"] = sector_rank_status["reason"]
+                cached_status["fallbackMessage"] = sector_rank_status["message"]
+                if sector_rank_status.get("detail"):
+                    cached_status["detail"] = sector_rank_status["detail"]
+                sector_rank_status = cached_status
+                warnings.append(
+                    f"sectorRank {sector_rank_status['fallbackReason']}; using cached rank "
+                    f"from {sector_rank_status['cachedAt']}"
+                )
 
     top_sectors = sectors[:5] if sector_rank_status["ready"] else []
     if top_sectors:
@@ -498,6 +548,7 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
         "cacheAgeSeconds": 0,
         "trendDays": TREND_DAYS,
         "trendCacheTtlSeconds": TREND_CACHE_TTL_SECONDS,
+        "sectorRankCacheMaxAgeSeconds": SECTOR_RANK_CACHE_MAX_AGE_SECONDS,
         "source": {
             "sectorRank": "Eastmoney push2 clist, fs=m:90+t:2, sorted by f3",
             "sectorKline": "Eastmoney push2his daily kline, secid=90.BKxxxx",
