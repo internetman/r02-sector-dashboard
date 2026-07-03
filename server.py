@@ -159,7 +159,17 @@ def get_sector_rank(limit: int = 20) -> list[dict[str, Any]]:
     return sectors
 
 
-def build_sector_rank_status(sectors: list[dict[str, Any]]) -> dict[str, Any]:
+def build_sector_rank_status(
+    sectors: list[dict[str, Any]],
+    error: str | None = None,
+) -> dict[str, Any]:
+    if error:
+        return {
+            "ready": False,
+            "reason": "source_error",
+            "message": "东方财富板块排行接口暂时失败，等待下一次刷新。",
+            "detail": error[:360],
+        }
     if not sectors:
         return {
             "ready": False,
@@ -415,8 +425,15 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
             {},
         )
         r02_breadth = read_future("r02Breadth", base_futures["r02Breadth"], {})
-        sectors = read_future("sectorRank", base_futures["sectorRank"], [])
-        sector_rank_status = build_sector_rank_status(sectors)
+        try:
+            sectors = base_futures["sectorRank"].result()
+        except Exception as exc:
+            sector_rank_error = str(exc)
+            warnings.append(f"sectorRank: {sector_rank_error}")
+            sectors = []
+        else:
+            sector_rank_error = None
+        sector_rank_status = build_sector_rank_status(sectors, sector_rank_error)
 
     top_sectors = sectors[:5] if sector_rank_status["ready"] else []
     if top_sectors:

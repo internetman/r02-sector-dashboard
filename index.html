@@ -967,6 +967,9 @@
       const sectorSummary = sectorRankReady
         ? `今日板块领涨：<strong>${escapeHtml(topNames || "--")}</strong>。${hotMatchesR02.length ? "领涨板块命中当前 R02 主线，值得继续做 R03/R04 复核。" : "领涨板块暂未直接命中当前 R02 主线，先按盘中强弱观察，不自动放宽交易权限。"}`
         : `板块排行：<strong>未就绪</strong>。${escapeHtml(sectorRankStatus.message || "等待实时行情源更新。")}`;
+      const sectorNoticeDetail = sectorRankStatus.reason === "source_error"
+        ? "东方财富实时板块接口暂时失败；页面保留指数、全市场温度和 R02 宽度模块，等待下一次刷新。"
+        : "当前快照全为 0，成交额、涨跌家数和领涨股均未更新；显示为排行会误导判断。";
       const top5Avg = visibleTop5.length
         ? visibleTop5.reduce((a, s) => a + (s.pct || 0), 0) / visibleTop5.length
         : null;
@@ -1050,7 +1053,7 @@
                   </thead>
                   <tbody>${renderSectors(visibleSectors)}</tbody>
                 </table>
-              </div>` : renderDataNotice("扩展排行暂不展示", "当前快照全为 0，成交额、涨跌家数和领涨股均未更新；显示为排行会误导判断。")}
+              </div>` : renderDataNotice("扩展排行暂不展示", sectorNoticeDetail)}
             </section>
 
             <section class="section">
