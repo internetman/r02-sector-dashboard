@@ -61,7 +61,7 @@ Vercel 函数会并发拉取同一批公开数据源，并使用较短上游超�
 ## 口径
 
 - 实时板块排行：东方财富 `push2` / `push2delay` 行业板块，`fs=m:90+t:2`，按 `f3` 当日涨跌幅排序。
-- 10 日趋势：东方财富 `push2his` 板块日 K，`secid=90.BKxxxx`，前端按首日收盘归一化为相对涨跌幅。
+- 10 日趋势：东方财富 `push2his` / `push2delay` 板块日 K，`secid=90.BKxxxx`，前端按首日收盘归一化为相对涨跌幅。
 - 领涨 10 股：东方财富 `push2` / `push2delay` 板块成分股，`fs=b:BKxxxx`，按 `f3` 当日涨跌幅排序。
 - 盘面指数：东方财富 `push2` / `push2delay` 指数行情。
 - 全市场涨跌分布：大盘云图 `mkt_idx.cur_chng_pct`。

@@ -101,8 +101,9 @@ def append_query_param(url: str, key: str, value: str) -> str:
 
 def fetch_eastmoney_json(url: str) -> dict[str, Any]:
     base_variants = [url]
-    if "push2.eastmoney.com" in url:
-        base_variants.append(url.replace("push2.eastmoney.com", "push2delay.eastmoney.com"))
+    for host in ("push2.eastmoney.com", "push2his.eastmoney.com"):
+        if host in url:
+            base_variants.append(url.replace(host, "push2delay.eastmoney.com"))
 
     variants = []
     for base_url in base_variants:
@@ -280,7 +281,7 @@ def get_sector_klines(code: str, days: int = TREND_DAYS) -> list[dict[str, Any]]
         "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
         f"&ut={EASTMONEY_UT}&klt=101&fqt=1&beg={begin}&end={end}&lmt=40"
     )
-    payload = fetch_json(url, EASTMONEY_REFERER)
+    payload = fetch_eastmoney_json(url)
     rows = payload.get("data", {}).get("klines") or []
     parsed = []
     for row in rows[-days:]:
@@ -585,7 +586,7 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
         "sectorRankCacheMaxAgeSeconds": SECTOR_RANK_CACHE_MAX_AGE_SECONDS,
         "source": {
             "sectorRank": "Eastmoney push2/push2delay clist, fs=m:90+t:2, sorted by f3",
-            "sectorKline": "Eastmoney push2his daily kline, secid=90.BKxxxx",
+            "sectorKline": "Eastmoney push2his/push2delay daily kline, secid=90.BKxxxx",
             "sectorLeaders": "Eastmoney push2/push2delay clist, fs=b:BKxxxx, sorted by f3",
             "indices": "Eastmoney push2/push2delay ulist",
             "marketDistribution": "Dapanyuntu mkt_idx.cur_chng_pct",
