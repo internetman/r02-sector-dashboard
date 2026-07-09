@@ -567,7 +567,8 @@
     const warningsBox = document.getElementById("warnings");
     const TREND_CACHE_KEY = "r02-sector-dashboard:trend-cache:v1";
     const SECTOR_RANK_CACHE_KEY = "r02-sector-dashboard:sector-rank-cache:v1";
-    const SECTOR_RANK_BROWSER_CACHE_MAX_AGE_SECONDS = 900;
+    const SECTOR_RANK_BROWSER_CACHE_MAX_AGE_SECONDS = 24 * 60 * 60;
+    const AUTO_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
     let hasRendered = false;
 
     const fmt = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
@@ -616,6 +617,15 @@
         minute: "2-digit",
         hour12: false
       });
+    }
+
+    function compactAge(seconds) {
+      if (seconds == null || Number.isNaN(seconds)) return "";
+      if (seconds < 60) return `${seconds}s前`;
+      const minutes = Math.round(seconds / 60);
+      if (minutes < 60) return `${minutes}分钟前`;
+      const hours = Math.round(minutes / 60);
+      return `${hours}小时前`;
     }
 
     function hasTrend(points) {
@@ -1018,7 +1028,7 @@
       const sectorRankReady = sectorRankStatus.ready !== false;
       const sectorRankCached = !!sectorRankStatus.cached;
       const sectorRankCacheText = sectorRankCached
-        ? `沿用上次排行 ${shortDateTime(sectorRankStatus.cachedAt)}`
+        ? `沿用上次排行 ${shortDateTime(sectorRankStatus.cachedAt)}${sectorRankStatus.cacheAgeSeconds != null ? `（${compactAge(sectorRankStatus.cacheAgeSeconds)}）` : ""}`
         : "";
       const visibleTop5 = sectorRankReady ? (data.top5 || []) : [];
       const visibleSectors = sectorRankReady ? (data.sectors || []) : [];
@@ -1143,7 +1153,7 @@
       `;
 
       const generated = new Date(data.generatedAt);
-      statusLine.textContent = `更新 ${generated.toLocaleTimeString("zh-CN", { hour12: false })} · 缓存 ${data.cacheAgeSeconds || 0}s / ${data.cacheTtlSeconds}s`;
+      statusLine.textContent = `更新 ${generated.toLocaleTimeString("zh-CN", { hour12: false })} · 自动 30分钟 · 缓存 ${data.cacheAgeSeconds || 0}s / ${data.cacheTtlSeconds}s`;
 
       if (data.warnings && data.warnings.length) {
         warningsBox.style.display = "block";
@@ -1179,8 +1189,8 @@
     }
 
     refreshBtn.addEventListener("click", () => load(true));
-    load(true);
-    setInterval(() => load(false), 60000);
+    load(false);
+    setInterval(() => load(false), AUTO_REFRESH_INTERVAL_MS);
   </script>
 </body>
 </html>

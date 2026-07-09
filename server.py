@@ -27,9 +27,10 @@ ROOT = Path(__file__).resolve().parent
 CACHE_TTL_SECONDS = 45
 TREND_CACHE_TTL_SECONDS = int(os.environ.get("R02_TREND_CACHE_TTL_SECONDS", "1800"))
 SECTOR_RANK_CACHE_MAX_AGE_SECONDS = int(
-    os.environ.get("R02_SECTOR_RANK_CACHE_MAX_AGE_SECONDS", "900")
+    os.environ.get("R02_SECTOR_RANK_CACHE_MAX_AGE_SECONDS", "86400")
 )
 FETCH_TIMEOUT_SECONDS = float(os.environ.get("R02_FETCH_TIMEOUT_SECONDS", "4"))
+FETCH_RETRY_ATTEMPTS = max(1, int(os.environ.get("R02_FETCH_RETRY_ATTEMPTS", "2")))
 API_WORKERS = int(os.environ.get("R02_API_WORKERS", "12"))
 
 EASTMONEY_REFERER = "https://quote.eastmoney.com/"
@@ -74,15 +75,48 @@ def fetch_json(url: str, referer: str, timeout: float | None = None) -> dict[str
             "Accept": "application/json,text/plain,*/*",
         },
     )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            raw = response.read().decode("utf-8")
-    except Exception as exc:  # pragma: no cover - surfaced to dashboard
-        raise FetchError(f"fetch failed: {url}: {exc}") from exc
+    last_exc: Exception | None = None
+    for attempt in range(FETCH_RETRY_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = response.read().decode("utf-8")
+            break
+        except Exception as exc:  # pragma: no cover - surfaced to dashboard
+            last_exc = exc
+            if attempt < FETCH_RETRY_ATTEMPTS - 1:
+                time.sleep(0.25 * (attempt + 1))
+                continue
+    else:
+        raise FetchError(f"fetch failed: {url}: {last_exc}") from last_exc
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
         raise FetchError(f"invalid json: {url}: {raw[:160]}") from exc
+
+
+def append_query_param(url: str, key: str, value: str) -> str:
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}{urllib.parse.urlencode({key: value})}"
+
+
+def fetch_eastmoney_json(url: str) -> dict[str, Any]:
+    base_variants = [url]
+    if "push2.eastmoney.com" in url:
+        base_variants.append(url.replace("push2.eastmoney.com", "push2delay.eastmoney.com"))
+
+    variants = []
+    for base_url in base_variants:
+        variants.append(base_url)
+        if "ut=" not in base_url:
+            variants.append(append_query_param(base_url, "ut", EASTMONEY_UT))
+
+    errors = []
+    for variant in dict.fromkeys(variants):
+        try:
+            return fetch_json(variant, EASTMONEY_REFERER)
+        except FetchError as exc:
+            errors.append(str(exc))
+    raise FetchError(" | ".join(errors)[:720])
 
 
 def num(value: Any) -> float | None:
@@ -115,7 +149,7 @@ def get_market_indices() -> list[dict[str, Any]]:
         "?fltt=2&invt=2&fields=f12,f13,f14,f2,f3,f4,f6&secids="
         + urllib.parse.quote(INDEX_SECIDS, safe=",.")
     )
-    payload = fetch_json(url, EASTMONEY_REFERER)
+    payload = fetch_eastmoney_json(url)
     diff = payload.get("data", {}).get("diff") or []
     return [
         {
@@ -137,7 +171,7 @@ def get_sector_rank(limit: int = 20) -> list[dict[str, Any]]:
         f"?pn=1&pz={limit}&po=1&np=1&fltt=2&invt=2&fid=f3"
         f"&fs=m:90+t:2&fields={fields}"
     )
-    payload = fetch_json(url, EASTMONEY_REFERER)
+    payload = fetch_eastmoney_json(url)
     diff = payload.get("data", {}).get("diff") or []
     sectors = []
     for rank, row in enumerate(diff, start=1):
@@ -210,7 +244,7 @@ def get_sector_leaders(code: str, limit: int = 10) -> list[dict[str, Any]]:
         f"?pn=1&pz={limit}&po=1&np=1&fltt=2&invt=2&fid=f3"
         f"&fs=b:{urllib.parse.quote(code)}&fields={fields}"
     )
-    payload = fetch_json(url, EASTMONEY_REFERER)
+    payload = fetch_eastmoney_json(url)
     diff = payload.get("data", {}).get("diff") or []
     leaders = []
     for rank, row in enumerate(diff, start=1):
@@ -550,10 +584,10 @@ def build_dashboard_payload(force: bool = False) -> dict[str, Any]:
         "trendCacheTtlSeconds": TREND_CACHE_TTL_SECONDS,
         "sectorRankCacheMaxAgeSeconds": SECTOR_RANK_CACHE_MAX_AGE_SECONDS,
         "source": {
-            "sectorRank": "Eastmoney push2 clist, fs=m:90+t:2, sorted by f3",
+            "sectorRank": "Eastmoney push2/push2delay clist, fs=m:90+t:2, sorted by f3",
             "sectorKline": "Eastmoney push2his daily kline, secid=90.BKxxxx",
-            "sectorLeaders": "Eastmoney push2 clist, fs=b:BKxxxx, sorted by f3",
-            "indices": "Eastmoney push2 ulist",
+            "sectorLeaders": "Eastmoney push2/push2delay clist, fs=b:BKxxxx, sorted by f3",
+            "indices": "Eastmoney push2/push2delay ulist",
             "marketDistribution": "Dapanyuntu mkt_idx.cur_chng_pct",
             "r02Breadth": "Dapanyuntu industry_ma20_analysis_range",
         },
