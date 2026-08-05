@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from server import M2_WATCHLIST, get_m2_history_payload, get_m2_watchlist_payload
+from server import M2_WATCHLIST, get_m2_history_payload
 
 
 def main() -> int:
@@ -34,11 +34,29 @@ def main() -> int:
     args = parser.parse_args()
 
     generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
-    quotes_payload = get_m2_watchlist_payload(force=True)
-    history_payload = get_m2_history_payload(force=True)
-    quotes = quotes_payload.get("quotes") or []
+    history_payload = get_m2_history_payload(force=True, completed_only=True)
     history = history_payload.get("history") or {}
     expected = len(M2_WATCHLIST)
+
+    quotes = []
+    for item in M2_WATCHLIST:
+        latest = (history.get(item["code"]) or {}).get("rows", [])[-1:]
+        if not latest:
+            continue
+        row = latest[0]
+        quotes.append(
+            {
+                "code": item["code"],
+                "name": item["name"],
+                "price": row.get("close"),
+                "pct": row.get("pct"),
+                "change": row.get("change"),
+                "volumeLots": row.get("volume"),
+                "amountYi": row.get("amountYi"),
+                "amplitude": row.get("amplitude"),
+                "turnover": row.get("turnover"),
+            }
+        )
 
     if len(quotes) < expected or len(history) < expected:
         print(
@@ -46,7 +64,7 @@ def main() -> int:
             f"history={len(history)}/{expected}",
             file=sys.stderr,
         )
-        for warning in (quotes_payload.get("warnings") or []) + (history_payload.get("warnings") or []):
+        for warning in history_payload.get("warnings") or []:
             print(f"- {warning}", file=sys.stderr)
         return 1
 
@@ -66,7 +84,7 @@ def main() -> int:
         "source": "Local Session · Eastmoney adjusted daily OHLCV + M2 VCP scan",
         "quotes": quotes,
         "history": history,
-        "warnings": (quotes_payload.get("warnings") or []) + (history_payload.get("warnings") or []),
+        "warnings": history_payload.get("warnings") or [],
     }
 
     output = args.output.resolve()

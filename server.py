@@ -76,7 +76,10 @@ M2_WATCHLIST = [
 
 _cache: dict[str, Any] = {"ts": 0.0, "payload": None}
 _m2_quote_cache: dict[str, Any] = {"ts": 0.0, "payload": None}
-_m2_history_cache: dict[str, Any] = {"ts": 0.0, "payload": None}
+_m2_history_cache: dict[str, dict[str, Any]] = {
+    "live": {"ts": 0.0, "payload": None},
+    "completed": {"ts": 0.0, "payload": None},
+}
 _trend_cache: dict[str, dict[str, Any]] = {}
 _sector_rank_cache: dict[str, Any] = {"ts": 0.0, "updatedAt": None, "rows": []}
 
@@ -280,8 +283,8 @@ def _range_pct(rows: list[dict[str, Any]]) -> float | None:
     return (max(highs) - min(lows)) / max(highs) * 100
 
 
-def _get_m2_history(item: dict[str, Any]) -> dict[str, Any]:
-    today = dt.date.today()
+def _get_m2_history(item: dict[str, Any], end_date: dt.date | None = None) -> dict[str, Any]:
+    today = end_date or dt.date.today()
     # 需要至少 200 个交易日的预热数据，避免图表前段出现断裂的 MA200。
     begin = (today - dt.timedelta(days=650)).strftime("%Y%m%d")
     end = today.strftime("%Y%m%d")
@@ -391,18 +394,25 @@ def _get_m2_history(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def get_m2_history_payload(force: bool = False) -> dict[str, Any]:
+def get_m2_history_payload(force: bool = False, completed_only: bool = False) -> dict[str, Any]:
+    cache = _m2_history_cache["completed" if completed_only else "live"]
     now = time.time()
-    if not force and _m2_history_cache["payload"] and now - _m2_history_cache["ts"] < 600:
-        cached = json.loads(json.dumps(_m2_history_cache["payload"], ensure_ascii=False))
-        cached["cacheAgeSeconds"] = round(now - _m2_history_cache["ts"])
+    if not force and cache["payload"] and now - cache["ts"] < 600:
+        cached = json.loads(json.dumps(cache["payload"], ensure_ascii=False))
+        cached["cacheAgeSeconds"] = round(now - cache["ts"])
         return cached
 
     generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    end_date = None
+    if completed_only:
+        shanghai_now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
+        before_close = shanghai_now.hour < 15 or (shanghai_now.hour == 15 and shanghai_now.minute < 30)
+        if before_close:
+            end_date = shanghai_now.date() - dt.timedelta(days=1)
     history: dict[str, Any] = {}
     warnings: list[str] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(API_WORKERS, len(M2_WATCHLIST))) as executor:
-        future_map = {executor.submit(_get_m2_history, item): item for item in M2_WATCHLIST}
+        future_map = {executor.submit(_get_m2_history, item, end_date): item for item in M2_WATCHLIST}
         for future in concurrent.futures.as_completed(future_map):
             item = future_map[future]
             try:
@@ -417,18 +427,19 @@ def get_m2_history_payload(force: bool = False) -> dict[str, Any]:
         "cacheAgeSeconds": 0,
         "sourceStatus": source_status,
         "source": "Eastmoney push2his/push2delay daily adjusted OHLCV",
+        "barStatus": "complete" if completed_only else "current",
         "history": history,
         "warnings": warnings,
     }
     if history:
-        _m2_history_cache["ts"] = now
-        _m2_history_cache["payload"] = payload
+        cache["ts"] = now
+        cache["payload"] = payload
         return payload
-    cached_payload = _m2_history_cache.get("payload")
+    cached_payload = cache.get("payload")
     if cached_payload:
         stale = json.loads(json.dumps(cached_payload, ensure_ascii=False))
         stale["sourceStatus"] = "stale"
-        stale["cacheAgeSeconds"] = round(now - _m2_history_cache["ts"])
+        stale["cacheAgeSeconds"] = round(now - cache["ts"])
         stale["warnings"] = warnings + ["动态日K源暂时失败，沿用上次成功数据。"]
         return stale
     return payload
