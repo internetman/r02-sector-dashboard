@@ -11,10 +11,15 @@
   };
   const distanceToPivot = (item) => {
     const price = Number.parseFloat(item.price);
-    const pivot = Number(item.pivotPrice);
+    const rawPivot = item.pivotPrice;
+    if (rawPivot === null || rawPivot === undefined || rawPivot === "") return item.distance || "—";
+    const pivot = Number(rawPivot);
     if (!Number.isFinite(price) || !Number.isFinite(pivot) || price <= 0) return item.distance || "—";
     const distance = ((pivot - price) / price) * 100;
-    return `${distance >= 0 ? "" : "−"}${Math.abs(distance).toFixed(2)}%`;
+    if (Math.abs(distance) < 0.01) return "已到达上沿";
+    return distance > 0
+      ? `距上沿 +${distance.toFixed(2)}%`
+      : `已越过 ${Math.abs(distance).toFixed(2)}%`;
   };
 
   $("lastSync").textContent = `结构快照 ${data.asOf}`;
@@ -69,6 +74,9 @@
     `).join("");
   };
 
+  data.candidates.forEach((item) => {
+    item.distance = distanceToPivot(item);
+  });
   renderCandidates();
 
   $("changeLog").innerHTML = data.changes.length
