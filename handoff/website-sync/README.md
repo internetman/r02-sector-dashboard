@@ -66,6 +66,12 @@ git push origin main
 handoff/website-sync/sync-to-vercel-repo.sh "你的提交信息"
 ```
 
+日常收盘后可以直接运行：
+
+```bash
+bash handoff/website-sync/refresh-m2-site.sh
+```
+
 6. 验证生产：
 
 ```bash
@@ -82,6 +88,7 @@ handoff/website-sync/verify-production.sh
 - M2 行情 Serverless Function：`api/m2-watchlist.py`
 - M2 动态日K Serverless Function：`api/m2-history.py`
 - M2 本地快照脚本：`handoff/website-sync/capture-m2-snapshot.py`
+- M2 一键抓取并发布：`handoff/website-sync/refresh-m2-site.sh`
 - 共享抓取逻辑：`server.py`
 - Vercel 配置：`vercel.json`
 - 无 npm / pip 依赖；当前只用 Python 标准库。
