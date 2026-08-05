@@ -1,4 +1,11 @@
-# R02 盘面板块雷达
+# 黑马量化：M2 首页与 R02 板块雷达
+
+生产网站现在采用两层入口：
+
+- `/`：Mark Minervini 2 个股趋势看板，作为首页；
+- `/radar.html`：原有 R02 盘面板块雷达，作为首页的跳转页。
+
+M2 看板负责主动查看阶段、筑底足迹、Pivot 和日K证据；R02 雷达负责板块温度、趋势和宽度校验。两套页面共用同一个部署，但不混淆各自的交易口径。
 
 本地 / Vercel 可部署的网页仪表盘，用于同时观察：
 
@@ -22,6 +29,12 @@ python3 server.py
 http://127.0.0.1:8765/
 ```
 
+原 R02 板块雷达在：
+
+```text
+http://127.0.0.1:8765/radar.html
+```
+
 也可以指定端口：
 
 ```bash
@@ -33,7 +46,12 @@ R02_DASHBOARD_PORT=8766 python3 server.py
 当前结构支持直接部署到 Vercel：
 
 ```text
-index.html          # 静态页面
+index.html          # M2 首页
+radar.html          # 原 R02 板块雷达
+m2-styles.css       # M2 首页样式
+m2-data.js          # M2 当前观察快照
+m2-app.js           # M2 首页渲染逻辑
+m2-assets/          # 候选股票图形证据
 server.py           # 本地服务 + 共享数据抓取逻辑
 api/dashboard.py    # Vercel Python Serverless Function
 vercel.json         # Other 框架、空构建命令、根目录静态输出、API 路由
@@ -42,7 +60,10 @@ vercel.json         # Other 框架、空构建命令、根目录静态输出、A
 Vercel 上的访问路径：
 
 - `/`：静态页面
+- `/radar.html`：原 R02 板块雷达
 - `/api/dashboard`：实时数据 JSON
+
+M2 的 `m2-data.js` 当前是观察快照，后续由 Hermes 的每日任务更新；收缩次数、底部时间和修正深度没有确认时必须保留“未确认 / 待计算”，不能写成确定买点。
 
 部署步骤：
 

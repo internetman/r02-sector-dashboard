@@ -24,6 +24,13 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent
+STATIC_FILES = {
+    "/": (ROOT / "index.html", "text/html; charset=utf-8"),
+    "/radar.html": (ROOT / "radar.html", "text/html; charset=utf-8"),
+    "/m2-styles.css": (ROOT / "m2-styles.css", "text/css; charset=utf-8"),
+    "/m2-data.js": (ROOT / "m2-data.js", "text/javascript; charset=utf-8"),
+    "/m2-app.js": (ROOT / "m2-app.js", "text/javascript; charset=utf-8"),
+}
 CACHE_TTL_SECONDS = 45
 TREND_CACHE_TTL_SECONDS = int(os.environ.get("R02_TREND_CACHE_TTL_SECONDS", "1800"))
 SECTOR_RANK_CACHE_MAX_AGE_SECONDS = int(
@@ -611,8 +618,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path == "/":
-            self.serve_file(ROOT / "index.html", "text/html; charset=utf-8")
+        if parsed.path in STATIC_FILES:
+            path, content_type = STATIC_FILES[parsed.path]
+            self.serve_file(path, content_type)
+            return
+        if parsed.path.startswith("/m2-assets/"):
+            asset_name = urllib.parse.unquote(parsed.path.removeprefix("/m2-assets/"))
+            if not asset_name or Path(asset_name).name != asset_name:
+                self.send_error(404, "Not found")
+                return
+            content_type = "image/jpeg" if asset_name.lower().endswith((".jpg", ".jpeg")) else "image/png"
+            self.serve_file(ROOT / "m2-assets" / asset_name, content_type)
             return
         if parsed.path == "/api/dashboard":
             params = urllib.parse.parse_qs(parsed.query)

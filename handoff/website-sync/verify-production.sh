@@ -25,5 +25,18 @@ for url in urls:
     print("warnings:", len(data.get("warnings") or []))
     for warning in (data.get("warnings") or [])[:5]:
         print("-", warning[:260])
-PY
 
+pages = [
+    ("https://www.heimaq.com/", "Mark Minervini 2"),
+    ("https://www.heimaq.com/radar.html", "R02 盘面板块雷达"),
+]
+
+for url, marker in pages:
+    print(f"\n{url}")
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=30) as response:
+        html = response.read().decode("utf-8")
+    if marker not in html:
+        raise RuntimeError(f"marker missing: {marker}")
+    print("page ok:", marker)
+PY

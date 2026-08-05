@@ -40,6 +40,12 @@ find "$WORKDIR" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 
 cp "$SOURCE_DIR/README.md" "$WORKDIR/README.md"
 cp "$SOURCE_DIR/index.html" "$WORKDIR/index.html"
+cp "$SOURCE_DIR/radar.html" "$WORKDIR/radar.html"
+cp "$SOURCE_DIR/m2-styles.css" "$WORKDIR/m2-styles.css"
+cp "$SOURCE_DIR/m2-data.js" "$WORKDIR/m2-data.js"
+cp "$SOURCE_DIR/m2-app.js" "$WORKDIR/m2-app.js"
+mkdir -p "$WORKDIR/m2-assets"
+cp "$SOURCE_DIR/m2-assets/"*.jpg "$WORKDIR/m2-assets/"
 cp "$SOURCE_DIR/server.py" "$WORKDIR/server.py"
 cp "$SOURCE_DIR/vercel.json" "$WORKDIR/vercel.json"
 cp "$SOURCE_DIR/.gitignore" "$WORKDIR/.gitignore"
@@ -55,9 +61,8 @@ if git -C "$WORKDIR" diff --quiet && git -C "$WORKDIR" diff --cached --quiet; th
   exit 0
 fi
 
-git -C "$WORKDIR" add README.md index.html server.py vercel.json .gitignore .vercelignore api/dashboard.py
+git -C "$WORKDIR" add README.md index.html radar.html m2-styles.css m2-data.js m2-app.js m2-assets server.py vercel.json .gitignore .vercelignore api/dashboard.py
 git -C "$WORKDIR" commit -m "$COMMIT_MESSAGE"
 git -C "$WORKDIR" push origin "$BRANCH"
 
 echo "Pushed. Vercel should deploy automatically from $PROD_REPO#$BRANCH."
-

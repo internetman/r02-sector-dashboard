@@ -4,6 +4,8 @@
 
 ## 当前项目
 
+生产网站的首页已经切换为 Mark Minervini 2 看板，原 R02 板块雷达保留为 `/radar.html`。
+
 - 源码目录：`/Users/leon/Library/Mobile Documents/iCloud~md~obsidian/Documents/投资/tools/r02-sector-dashboard`
 - 源码仓库：`https://github.com/internetman/r02-sector-dashboard.git`
 - Vercel 绑定仓库：`https://github.com/internetman/blackhorse-quant.git`
@@ -71,7 +73,9 @@ handoff/website-sync/verify-production.sh
 
 ## 当前部署口径
 
-- 静态页面：`index.html`
+- 静态首页：`index.html`（Mark Minervini 2）
+- R02 雷达页：`radar.html`
+- M2 静态资源：`m2-styles.css`、`m2-data.js`、`m2-app.js`、`m2-assets/`
 - Vercel Python Serverless Function：`api/dashboard.py`
 - 共享抓取逻辑：`server.py`
 - Vercel 配置：`vercel.json`
@@ -108,4 +112,3 @@ handoff/website-sync/verify-production.sh
 - API 返回 `warnings` 但主排行不空：可继续展示，提醒这是公开源不稳定。
 - 板块排行不空但趋势为空：趋势 K 线接口可能失败，页面会尝试服务器和浏览器趋势缓存。
 - Vercel 没更新：先确认 `blackhorse-quant` 的 `main` 分支是否收到新 commit，再去 Vercel 看 deployment。
-
