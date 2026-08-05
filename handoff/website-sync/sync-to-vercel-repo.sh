@@ -22,9 +22,14 @@ const fs = require('fs');
 const htmlPath = process.argv[2];
 const html = fs.readFileSync(htmlPath, 'utf8');
 const match = html.match(/<script>([\s\S]*)<\/script>/);
-if (!match) throw new Error('script tag not found');
-new Function(match[1]);
-console.log('index script syntax ok');
+if (match) {
+  new Function(match[1]);
+  console.log('index inline script syntax ok');
+} else if (/<script\s+src=/i.test(html)) {
+  console.log('index external scripts detected');
+} else {
+  throw new Error('script tag not found');
+}
 NODE
 
 if [ ! -d "$WORKDIR/.git" ]; then
