@@ -30,6 +30,25 @@ for url in urls:
     for warning in (data.get("warnings") or [])[:5]:
         print("-", warning[:260])
 
+quote_urls = [
+    "https://www.heimaq.com/api/m2-watchlist?force=1",
+    "https://blackhorse-quant.vercel.app/api/m2-watchlist?force=1",
+]
+
+for url in quote_urls:
+    print(f"\n{url}")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        print("unavailable:", exc)
+        continue
+    quotes = data.get("quotes") or []
+    print("sourceStatus:", data.get("sourceStatus"), "quotes:", len(quotes), "generatedAt:", data.get("generatedAt"))
+    if not quotes:
+        raise RuntimeError("M2 watchlist quote endpoint returned no quotes")
+
 pages = [
     ("https://www.heimaq.com/", "Mark Minervini 2"),
     ("https://www.heimaq.com/radar", "R02 盘面板块雷达"),

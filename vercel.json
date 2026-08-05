@@ -8,12 +8,19 @@
   "functions": {
     "api/dashboard.py": {
       "maxDuration": 30
+    },
+    "api/m2-watchlist.py": {
+      "maxDuration": 10
     }
   },
   "rewrites": [
     {
       "source": "/api/dashboard",
       "destination": "/api/dashboard.py"
+    },
+    {
+      "source": "/api/m2-watchlist",
+      "destination": "/api/m2-watchlist.py"
     },
     {
       "source": "/(.*)",

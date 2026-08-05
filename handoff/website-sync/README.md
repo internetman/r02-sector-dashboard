@@ -11,7 +11,7 @@
 - Vercel 绑定仓库：`https://github.com/internetman/blackhorse-quant.git`
 - 生产域名：`https://www.heimaq.com/`
 - Vercel 默认域名：`https://blackhorse-quant.vercel.app/`
-- API：`/api/dashboard`
+- API：`/api/dashboard`、`/api/m2-watchlist`
 
 当前部署方式是：先维护源码仓库，再同步同一套文件到 `internetman/blackhorse-quant` 的 `main` 分支；Vercel 已绑定 `blackhorse-quant`，push 后会自动生产部署。
 
@@ -77,6 +77,7 @@ handoff/website-sync/verify-production.sh
 - R02 雷达页：`/radar`（源码文件：`radar.html`）
 - M2 静态资源：`m2-styles.css`、`m2-data.js`、`m2-app.js`、`m2-assets/`
 - Vercel Python Serverless Function：`api/dashboard.py`
+- M2 行情 Serverless Function：`api/m2-watchlist.py`
 - 共享抓取逻辑：`server.py`
 - Vercel 配置：`vercel.json`
 - 无 npm / pip 依赖；当前只用 Python 标准库。
@@ -89,10 +90,12 @@ handoff/website-sync/verify-production.sh
 - 领涨股：东方财富 `push2` / `push2delay`，`fs=b:BKxxxx`
 - 全市场涨跌分布：大盘云图 `mkt_idx.cur_chng_pct`
 - R02 宽度：大盘云图 `industry_ma20_analysis_range`
+- M2 候选股行情：东方财富 `push2` / `push2delay` `ulist.np`
 
 刷新与缓存：
 
-- 页面自动刷新：30 分钟
+- M2 候选股行情自动刷新：5 分钟
+- R02 雷达页面自动刷新：30 分钟
 - 手动按钮：强制刷新
 - 服务端短缓存：45 秒
 - 趋势缓存：30 分钟

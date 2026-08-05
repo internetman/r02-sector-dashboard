@@ -59,7 +59,17 @@ R02_CURRENT = {
     ),
 }
 
+M2_WATCHLIST = [
+    {"code": "300628", "market": "0", "name": "亿联网络"},
+    {"code": "601677", "market": "1", "name": "明泰铝业"},
+    {"code": "002648", "market": "0", "name": "卫星化学"},
+    {"code": "601872", "market": "1", "name": "招商轮船"},
+    {"code": "300750", "market": "0", "name": "宁德时代"},
+    {"code": "000582", "market": "0", "name": "北部湾港"},
+]
+
 _cache: dict[str, Any] = {"ts": 0.0, "payload": None}
+_m2_quote_cache: dict[str, Any] = {"ts": 0.0, "payload": None}
 _trend_cache: dict[str, dict[str, Any]] = {}
 _sector_rank_cache: dict[str, Any] = {"ts": 0.0, "updatedAt": None, "rows": []}
 
@@ -171,6 +181,80 @@ def get_market_indices() -> list[dict[str, Any]]:
         }
         for row in diff
     ]
+
+
+def get_m2_watchlist_quotes() -> list[dict[str, Any]]:
+    secids = ",".join(f"{item['market']}.{item['code']}" for item in M2_WATCHLIST)
+    url = (
+        "https://push2.eastmoney.com/api/qt/ulist.np/get"
+        "?fltt=2&invt=2&fields=f12,f13,f14,f2,f3,f4,f5,f6,f7,f8&secids="
+        + urllib.parse.quote(secids, safe=".,")
+    )
+    payload = fetch_eastmoney_json(url)
+    diff = payload.get("data", {}).get("diff") or []
+    rows_by_code = {str(row.get("f12")): row for row in diff}
+    quotes = []
+    for item in M2_WATCHLIST:
+        row = rows_by_code.get(item["code"])
+        if not row:
+            continue
+        quotes.append(
+            {
+                "code": item["code"],
+                "name": row.get("f14") or item["name"],
+                "price": num(row.get("f2")),
+                "pct": num(row.get("f3")),
+                "change": num(row.get("f4")),
+                "volumeLots": num(row.get("f5")),
+                "amountYi": money_yi(num(row.get("f6"))),
+                "amplitude": num(row.get("f7")),
+                "turnover": num(row.get("f8")),
+            }
+        )
+    if not quotes:
+        raise FetchError("M2 watchlist quote source returned no rows")
+    return quotes
+
+
+def get_m2_watchlist_payload(force: bool = False) -> dict[str, Any]:
+    now = time.time()
+    if not force and _m2_quote_cache["payload"] and now - _m2_quote_cache["ts"] < CACHE_TTL_SECONDS:
+        cached = dict(_m2_quote_cache["payload"])
+        cached["cacheAgeSeconds"] = round(now - _m2_quote_cache["ts"])
+        return cached
+
+    generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    try:
+        quotes = get_m2_watchlist_quotes()
+        payload = {
+            "generatedAt": generated_at,
+            "cacheTtlSeconds": CACHE_TTL_SECONDS,
+            "cacheAgeSeconds": 0,
+            "sourceStatus": "live",
+            "source": "Eastmoney push2/push2delay ulist",
+            "quotes": quotes,
+            "warnings": [],
+        }
+        _m2_quote_cache["ts"] = now
+        _m2_quote_cache["payload"] = payload
+        return payload
+    except Exception as exc:
+        cached_payload = _m2_quote_cache.get("payload")
+        if cached_payload:
+            stale = dict(cached_payload)
+            stale["sourceStatus"] = "stale"
+            stale["cacheAgeSeconds"] = round(now - _m2_quote_cache["ts"])
+            stale["warnings"] = [f"行情源暂时失败，沿用上次报价：{exc}"]
+            return stale
+        return {
+            "generatedAt": generated_at,
+            "cacheTtlSeconds": CACHE_TTL_SECONDS,
+            "cacheAgeSeconds": 0,
+            "sourceStatus": "unavailable",
+            "source": "Eastmoney push2/push2delay ulist",
+            "quotes": [],
+            "warnings": [f"行情源暂时失败：{exc}"],
+        }
 
 
 def get_sector_rank(limit: int = 20) -> list[dict[str, Any]]:
@@ -635,6 +719,11 @@ class Handler(BaseHTTPRequestHandler):
             params = urllib.parse.parse_qs(parsed.query)
             force = params.get("force", ["0"])[0] == "1"
             self.serve_json(build_dashboard_payload(force=force))
+            return
+        if parsed.path == "/api/m2-watchlist":
+            params = urllib.parse.parse_qs(parsed.query)
+            force = params.get("force", ["0"])[0] == "1"
+            self.serve_json(get_m2_watchlist_payload(force=force))
             return
         self.send_error(404, "Not found")
 
