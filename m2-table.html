@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c1118" />
+    <title>8-5 早盘导入表 · Mark Minervini 2</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c1118'/%3E%3Cpath d='M5 22 12 14l5 4 10-11' fill='none' stroke='%2398e59b' stroke-width='3'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="m2-styles.css" />
+    <link rel="stylesheet" href="m2-table.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <div class="app-shell">
+      <aside class="rail">
+        <div class="brand-mark"><span>M2</span><i></i></div>
+        <div class="rail-label">MARKET METHOD</div>
+        <nav class="rail-nav" aria-label="主导航">
+          <a href="/"><span class="nav-dot"></span>今日雷达</a>
+          <a class="active" href="/m2-table"><span class="nav-dot"></span>导入表格</a>
+          <a href="/#watchlist"><span class="nav-dot"></span>候选足迹</a>
+          <a href="/radar"><span class="nav-dot"></span>R02 板块雷达 ↗</a>
+        </nav>
+        <div class="rail-bottom">
+          <div class="source-pip"><span></span> IMPORT SNAPSHOT</div>
+          <small>8-5 早盘<br />i问财导出</small>
+        </div>
+      </aside>
+
+      <main class="main-content table-main">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow">MARK MINERVINI 2 <span>/</span> IMPORT SNAPSHOT</div>
+            <h1>8-5 早盘导入表</h1>
+          </div>
+          <div class="topbar-meta">
+            <div class="last-sync"><span class="live-dot"></span><span id="tableAsOf">读取中</span></div>
+            <a class="radar-link" href="/">M2 首页 <span>↗</span></a>
+            <a class="radar-link" href="/radar">R02 雷达 <span>↗</span></a>
+          </div>
+        </header>
+
+        <section class="table-intro">
+          <div>
+            <div class="section-kicker">WHY THIS TABLE EXISTS</div>
+            <h2>先用表格看资格，再回到图形看买点</h2>
+            <p>这是一份 i 问财导出快照。它适合横向比较均线、价格位置和量级；Pivot、收缩次数与第二阶段确认仍需回到日K和历史 OHLCV 核验。</p>
+          </div>
+          <div class="table-source">SOURCE<br /><strong id="tableSource">—</strong></div>
+        </section>
+
+        <section class="table-summary" aria-label="导入表摘要">
+          <article><span>导入股票</span><strong id="summaryTotal">—</strong><small>本次快照</small></article>
+          <article><span>均线顺序</span><strong id="summaryStacked">—</strong><small>MA50 &gt; MA150 &gt; MA200</small></article>
+          <article><span>站上 MA200</span><strong id="summaryAbove200">—</strong><small>仅是资格，不是买点</small></article>
+          <article><span>接近区间高点</span><strong id="summaryNearHigh">—</strong><small>距高点不超过 10%</small></article>
+          <article><span>今日上涨</span><strong id="summaryUp">—</strong><small>导出时点涨跌幅</small></article>
+        </section>
+
+        <section class="table-controls" aria-label="表格筛选">
+          <label class="table-search"><span>查找股票</span><input id="tableSearch" type="search" placeholder="代码或简称" /></label>
+          <label><span>资格视图</span><select id="tableFilter"><option value="all">全部导入股票</option><option value="stacked">MA50 &gt; MA150 &gt; MA200</option><option value="nearHigh">距区间高点 ≤ 10%</option><option value="needsPivot">Pivot / 收缩待确认</option></select></label>
+          <label><span>排序</span><select id="tableSort"><option value="pct">今日涨跌幅</option><option value="fromHigh">距离区间高点</option><option value="fromLow">从区间低点反弹</option><option value="amount">平均成交额</option><option value="price">现价</option></select></label>
+          <div class="table-count"><strong id="visibleCount">—</strong><span>行可见</span></div>
+        </section>
+
+        <section class="table-card">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th class="sticky-name">股票</th>
+                  <th>现价</th>
+                  <th>今日涨跌</th>
+                  <th>MA50</th>
+                  <th>MA150</th>
+                  <th>MA200</th>
+                  <th>均线结构</th>
+                  <th>阶段涨幅<br /><small>7/9 → 8/5</small></th>
+                  <th>距区间高点</th>
+                  <th>从低点反弹</th>
+                  <th>均额<br /><small>元</small></th>
+                  <th>市值<br /><small>亿元</small></th>
+                  <th>PB</th>
+                  <th>PE</th>
+                  <th>Pivot</th>
+                  <th>收缩</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+          <div class="table-footnote"><span class="footnote-mark">!</span><p>表格中的“均线结构”只代表导出时点的数值关系；它不能单独证明股票处于第二阶段。Pivot、收缩次数和买点必须结合图形、平台持续时间、波动收窄和突破量能复核。</p></div>
+        </section>
+
+        <footer class="page-footer">M2 / 导入表负责横向筛选 · 卡片页负责候选足迹 · R02 负责板块环境 <a class="footer-link" href="/">返回 M2 首页 ↗</a></footer>
+      </main>
+    </div>
+    <script src="m2-table-data.js"></script>
+    <script src="m2-table-app.js"></script>
+  </body>
+</html>

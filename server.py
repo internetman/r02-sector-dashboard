@@ -31,6 +31,11 @@ STATIC_FILES = {
     "/m2-styles.css": (ROOT / "m2-styles.css", "text/css; charset=utf-8"),
     "/m2-data.js": (ROOT / "m2-data.js", "text/javascript; charset=utf-8"),
     "/m2-app.js": (ROOT / "m2-app.js", "text/javascript; charset=utf-8"),
+    "/m2-table": (ROOT / "m2-table.html", "text/html; charset=utf-8"),
+    "/m2-table.html": (ROOT / "m2-table.html", "text/html; charset=utf-8"),
+    "/m2-table.css": (ROOT / "m2-table.css", "text/css; charset=utf-8"),
+    "/m2-table-data.js": (ROOT / "m2-table-data.js", "text/javascript; charset=utf-8"),
+    "/m2-table-app.js": (ROOT / "m2-table-app.js", "text/javascript; charset=utf-8"),
 }
 CACHE_TTL_SECONDS = 45
 TREND_CACHE_TTL_SECONDS = int(os.environ.get("R02_TREND_CACHE_TTL_SECONDS", "1800"))

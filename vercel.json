@@ -23,6 +23,10 @@
       "destination": "/api/m2-watchlist.py"
     },
     {
+      "source": "/m2-table",
+      "destination": "/m2-table.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
