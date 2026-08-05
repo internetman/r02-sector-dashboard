@@ -34,6 +34,10 @@
     if (kind === "contractionDetail") return `${metrics.vcpStatus}；需人工确认`;
     return fallback;
   };
+  // The cards are rendered more than once (for example when a quote snapshot
+  // arrives after the history snapshot). Keep the chart repaint hook alive so
+  // a late card refresh cannot replace a loaded SVG with a loading placeholder.
+  let renderDynamicCharts = () => {};
   const renderVcpChart = (container, history, item, large = false) => {
     if (!container) return;
     const rows = history?.rows || [];
@@ -168,13 +172,14 @@
       </div>
       <div class="structure-note"><span>VCP 动态扫描</span><strong>${chartMetric(item, "contractionDetail", item.contractionDetail)}</strong><small>量能条件：${item.volumeRule}</small></div>
       <button class="chart-thumb dynamic-chart-thumb" type="button" data-code="${item.code}" data-name="${item.name} ${item.code}">
-        <div class="dynamic-chart-content"><div class="chart-loading">读取动态日K…</div></div>
+        <div class="dynamic-chart-content"><div class="chart-loading">等待选股快照…</div></div>
         <span>动态 VCP 图 <b>↗</b></span>
       </button>
       <div class="stock-action"><span class="action-mark">↳</span><p>${item.action}</p></div>
       <div class="stock-note">${item.note}</div>
     </article>
     `).join("");
+    renderDynamicCharts();
   };
 
   data.candidates.forEach((item) => {
@@ -209,7 +214,7 @@
     if (event.key === "Escape") closeModal();
   });
 
-  const renderDynamicCharts = () => {
+  renderDynamicCharts = () => {
     data.candidates.forEach((item) => {
       const container = document.querySelector(`.dynamic-chart-thumb[data-code="${item.code}"] .dynamic-chart-content`);
       if (container) renderVcpChart(container, historyCache.get(String(item.code)), item);
@@ -273,8 +278,70 @@
     }
   };
 
-  syncLiveQuotes();
-  syncHistory();
-  window.setInterval(syncLiveQuotes, 5 * 60 * 1000);
-  window.setInterval(syncHistory, 10 * 60 * 1000);
+  const applySnapshot = (payload) => {
+    const entries = Object.entries(payload.history || {});
+    entries.forEach(([code, history]) => historyCache.set(String(code), history));
+    const quotes = new Map((payload.quotes || []).map((quote) => [String(quote.code), quote]));
+    data.candidates.forEach((item) => {
+      const quote = quotes.get(String(item.code));
+      if (!quote) return;
+      if (Number.isFinite(Number(quote.price))) item.price = formatPrice(quote.price);
+      if (Number.isFinite(Number(quote.pct))) item.change = formatPct(quote.pct);
+      item.distance = distanceToPivot(item);
+    });
+    renderCandidates();
+    return entries;
+  };
+
+  const displayTime = (value) => {
+    const time = value ? new Date(value) : null;
+    return time && !Number.isNaN(time.getTime())
+      ? time.toLocaleString("zh-CN", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+      : value || "—";
+  };
+
+  const syncSnapshot = async () => {
+    const historySync = $("historySync");
+    try {
+      // The normal path is a static snapshot produced by the local Session.
+      // This makes the page a display layer and avoids six cold-start requests
+      // every time the page is opened.
+      const response = await fetch(`/m2-snapshot.json?ts=${Date.now()}`, { cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      const entries = applySnapshot(payload);
+      if (!entries.length) throw new Error("选股快照没有历史日K");
+      const generated = payload.generatedAt ? Date.parse(payload.generatedAt) : NaN;
+      const ageHours = Number.isFinite(generated) ? Math.max(0, (Date.now() - generated) / 3600000) : null;
+      const maxAgeHours = Number(payload.maxAgeHours || 36);
+      const partial = payload.barStatus === "partial";
+      const expired = payload.sourceStatus !== "live" || partial || (ageHours !== null && ageHours > maxAgeHours);
+      $("lastSync").textContent = `选股快照 ${payload.asOf || data.asOf}`;
+      $("quoteSync").textContent = `报价随快照 · ${displayTime(payload.generatedAt)}`;
+      $("quoteSync").classList.toggle("stale", expired);
+      $("quoteSync").classList.toggle("ready", !expired);
+      const statusText = partial ? "选股日K盘中临时" : (expired ? "选股日K已过期" : "选股日K已就绪");
+      historySync.textContent = `${statusText} ${payload.asOf || ""} · ${entries.length}/${data.candidates.length}`;
+      historySync.classList.toggle("stale", expired);
+      historySync.classList.toggle("ready", !expired);
+    } catch (error) {
+      // Keep an API fallback for development and for the first deployment
+      // before the local Session has uploaded its first snapshot.
+      try {
+        await syncHistory();
+        await syncLiveQuotes();
+        historySync.textContent = "本地快照未就绪，临时读取数据源";
+        historySync.classList.add("stale");
+      } catch (fallbackError) {
+        historySync.textContent = "选股快照读取失败";
+        historySync.classList.add("stale");
+        console.warn("M2 snapshot sync failed", error, fallbackError);
+      }
+    }
+  };
+
+  syncSnapshot();
+  // A daily selection snapshot does not need intraday polling. This only lets
+  // an already-open page notice a newly uploaded local Session snapshot.
+  window.setInterval(syncSnapshot, 30 * 60 * 1000);
 })();

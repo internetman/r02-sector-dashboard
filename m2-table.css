@@ -64,8 +64,8 @@
 .table-scroll td.name-cell { text-align: left; min-width: 146px; font-family: var(--display); }
 .name-cell strong { display: block; color: var(--paper); font-size: 12px; font-weight: 500; }
 .name-cell small { display: block; margin-top: 4px; color: var(--muted); font: 8px var(--mono); }
-.pct-up { color: var(--green); }
-.pct-down { color: var(--red); }
+.pct-up { color: var(--red); }
+.pct-down { color: var(--green); }
 .ma-pass { color: var(--green); }
 .ma-warn { color: var(--yellow); }
 .near-high { color: var(--orange); }

@@ -120,8 +120,9 @@ h3 { font-size: 16px; font-weight: 500; }
 .stock-price-row { margin: 21px 0 15px; justify-content: flex-start; gap: 10px; }
 .stock-price-row > strong { font: 25px var(--mono); letter-spacing: -.08em; }
 .change { font: 11px var(--mono); }
-.change.up { color: var(--green); }
-.change.down { color: var(--red); }
+/* A-share convention: red = rise, green = fall. */
+.change.up { color: var(--red); }
+.change.down { color: var(--green); }
 .stage-tag { margin-left: auto; color: var(--muted); border-left: 1px solid var(--line); padding-left: 9px; }
 .signal-row { gap: 8px; color: var(--muted); font: 9px var(--mono); }
 .signal-bar { flex: 1; }
