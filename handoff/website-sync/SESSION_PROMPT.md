@@ -21,7 +21,7 @@
 - 不要提交 `.env`、真实 token、浏览器 cookie、`.vercel/`、`__pycache__/`。
 - 当前没有项目 API key；GitHub/Vercel 权限依赖用户本机已登录的 Git 凭证和 Vercel GitHub 集成。
 - 不输出买卖建议。盘中热度与正式 R02 宽度分层展示。
-- 网站 `/` 是 M2 首页；原有板块雷达保留在 `/radar.html`。
+- 网站 `/` 是 M2 首页；原有板块雷达保留在 `/radar`。
 - M2 的 `m2-data.js` 是当前观察快照；更新时不能把“未确认 / 待计算”写成确定结论。
 
 常用命令：

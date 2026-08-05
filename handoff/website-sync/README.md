@@ -4,7 +4,7 @@
 
 ## 当前项目
 
-生产网站的首页已经切换为 Mark Minervini 2 看板，原 R02 板块雷达保留为 `/radar.html`。
+生产网站的首页已经切换为 Mark Minervini 2 看板，原 R02 板块雷达保留为 `/radar`。
 
 - 源码目录：`/Users/leon/Library/Mobile Documents/iCloud~md~obsidian/Documents/投资/tools/r02-sector-dashboard`
 - 源码仓库：`https://github.com/internetman/r02-sector-dashboard.git`
@@ -74,7 +74,7 @@ handoff/website-sync/verify-production.sh
 ## 当前部署口径
 
 - 静态首页：`index.html`（Mark Minervini 2）
-- R02 雷达页：`radar.html`
+- R02 雷达页：`/radar`（源码文件：`radar.html`）
 - M2 静态资源：`m2-styles.css`、`m2-data.js`、`m2-app.js`、`m2-assets/`
 - Vercel Python Serverless Function：`api/dashboard.py`
 - 共享抓取逻辑：`server.py`

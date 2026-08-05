@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parent
 STATIC_FILES = {
     "/": (ROOT / "index.html", "text/html; charset=utf-8"),
     "/radar.html": (ROOT / "radar.html", "text/html; charset=utf-8"),
+    "/radar": (ROOT / "radar.html", "text/html; charset=utf-8"),
     "/m2-styles.css": (ROOT / "m2-styles.css", "text/css; charset=utf-8"),
     "/m2-data.js": (ROOT / "m2-data.js", "text/javascript; charset=utf-8"),
     "/m2-app.js": (ROOT / "m2-app.js", "text/javascript; charset=utf-8"),

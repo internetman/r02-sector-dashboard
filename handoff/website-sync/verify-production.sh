@@ -28,7 +28,7 @@ for url in urls:
 
 pages = [
     ("https://www.heimaq.com/", "Mark Minervini 2"),
-    ("https://www.heimaq.com/radar.html", "R02 盘面板块雷达"),
+    ("https://www.heimaq.com/radar", "R02 盘面板块雷达"),
 ]
 
 for url, marker in pages:
