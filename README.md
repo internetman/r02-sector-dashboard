@@ -3,7 +3,7 @@
 生产网站现在采用两层入口：
 
 - `/`：Mark Minervini 2 个股趋势看板，作为首页；
-- `/m2-table`：最近一次 i 问财导入快照的关键字段表格，用于横向比较；
+- `/m2-table`：最近一次 i 问财导入快照的关键字段表格，并提供均线距离、阶段推演和建议分层图形；
 - `/radar`：原有 R02 盘面板块雷达，作为首页的跳转页（源码文件为 `radar.html`）。
 
 M2 看板负责主动查看阶段、筑底足迹、Pivot、日K证据和规则化购买建议；R02 雷达负责板块温度、趋势和宽度校验。两套页面共用同一个部署，但不混淆各自的交易口径。
@@ -55,8 +55,8 @@ m2-app.js           # M2 首页渲染逻辑
 m2-assets/          # 候选股票图形证据
 m2-table.html       # i问财导入表格页
 m2-table-data.js    # 由导入 xlsx 提取的表格快照
-m2-table-app.js     # 表格筛选、排序与摘要
-m2-table.css        # 表格页样式
+m2-table-app.js     # 表格筛选、排序、推演摘要与图形
+m2-table.css        # 表格页与推演图形样式
 server.py           # 本地服务 + 共享数据抓取逻辑
 api/dashboard.py    # Vercel Python Serverless Function
 api/m2-watchlist.py # M2 候选股实时行情接口

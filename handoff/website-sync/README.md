@@ -74,7 +74,7 @@ handoff/website-sync/verify-production.sh
 ## 当前部署口径
 
 - 静态首页：`index.html`（Mark Minervini 2）
-- M2 导入表格页：`m2-table.html`（当前 8-5 早盘 i问财快照）
+- M2 导入表格页：`m2-table.html`（当前 8-5 早盘 i问财快照，含关键数据表、均线距离推演和摘要图形）
 - R02 雷达页：`/radar`（源码文件：`radar.html`）
 - M2 静态资源：`m2-styles.css`、`m2-data.js`、`m2-app.js`、`m2-assets/`
 - Vercel Python Serverless Function：`api/dashboard.py`

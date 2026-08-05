@@ -9,6 +9,39 @@
 .table-summary span, .table-summary small { display: block; color: var(--muted); font: 9px var(--mono); }
 .table-summary strong { display: block; margin: 11px 0 5px; color: var(--paper); font: 24px var(--mono); letter-spacing: -.08em; }
 .table-summary small { font-size: 8px; line-height: 1.4; }
+.deduction-board { margin-top: 12px; padding: 24px 25px 20px; border: 1px solid var(--line); background: linear-gradient(130deg, rgba(23, 35, 45, .96), rgba(12, 18, 26, .9)); }
+.deduction-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.deduction-heading h2 { margin: 9px 0 8px; font-size: clamp(18px, 2vw, 25px); font-weight: 500; letter-spacing: -.03em; }
+.deduction-heading p { max-width: 760px; color: var(--muted); font-size: 10px; line-height: 1.65; }
+.deduction-stamp { flex: 0 0 178px; padding: 11px 13px; border-left: 1px solid var(--green); background: rgba(152,229,155,.045); }
+.deduction-stamp span, .deduction-stamp small { display: block; color: var(--muted); font: 8px var(--mono); }
+.deduction-stamp strong { display: block; margin: 7px 0 4px; color: var(--green); font: 12px var(--mono); }
+.deduction-flow { display: flex; align-items: stretch; gap: 8px; margin-top: 21px; }
+.deduction-flow > div { flex: 1; min-width: 0; padding: 12px 11px; border: 1px solid var(--line); background: rgba(8, 13, 19, .55); }
+.deduction-flow > div.flow-pending { border-color: rgba(232,199,109,.42); background: rgba(232,199,109,.05); }
+.deduction-flow i { display: grid; place-items: center; color: var(--muted); font: 16px var(--mono); font-style: normal; }
+.deduction-flow small, .deduction-flow span { display: block; color: var(--muted); font: 8px var(--mono); line-height: 1.4; }
+.deduction-flow strong { display: block; margin: 8px 0 5px; color: var(--paper); font: 23px var(--mono); letter-spacing: -.08em; }
+.deduction-flow .flow-pending strong { color: var(--yellow); }
+.analysis-charts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+.analysis-panel { min-width: 0; padding: 15px 16px 13px; border: 1px solid var(--line); background: rgba(9, 15, 22, .62); }
+.analysis-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.analysis-panel-head span { color: var(--paper); font: 11px var(--display); }
+.analysis-panel-head small { color: var(--muted); font: 8px var(--mono); }
+.bar-chart { display: grid; gap: 10px; }
+.bar-row { display: grid; grid-template-columns: 82px minmax(40px, 1fr) 36px; align-items: center; gap: 8px; min-height: 16px; }
+.bar-row > span { overflow: hidden; color: var(--muted); font: 8px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.bar-row > strong { color: var(--paper); font: 9px var(--mono); text-align: right; }
+.bar-track { height: 7px; background: #1c2a34; }
+.bar-track i { display: block; height: 100%; min-width: 3px; background: var(--green); }
+.bar-track i.priority { background: var(--green); }
+.bar-track i.caution { background: var(--orange); }
+.bar-track i.wait { background: var(--blue); }
+.bar-track i.avoid { background: var(--red); }
+.bar-track i.near { background: var(--orange); }
+.bar-track i.ma { background: var(--green); }
+.deduction-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); }
+.deduction-note p { font-size: 9px; line-height: 1.6; }
 .table-controls { display: flex; align-items: flex-end; gap: 12px; margin: 24px 0 12px; padding: 15px 17px; border: 1px solid var(--line); background: rgba(10, 16, 23, .72); }
 .table-controls label { display: grid; gap: 6px; min-width: 178px; color: var(--muted); font: 8px var(--mono); }
 .table-controls .table-search { flex: 1; }
@@ -37,6 +70,13 @@
 .ma-warn { color: var(--yellow); }
 .near-high { color: var(--orange); }
 .pivot-pending, .contraction-pending { color: var(--yellow); }
+.derived-cell { min-width: 205px; text-align: left !important; white-space: normal !important; }
+.derived-cell strong, .stage-cell strong { display: block; font: 10px var(--mono); }
+.derived-cell strong { color: var(--green); }
+.derived-cell small, .stage-cell small { display: block; margin-top: 5px; color: var(--muted); font: 8px/1.4 var(--mono); }
+.stage-cell { min-width: 125px; text-align: left !important; white-space: normal !important; }
+.stage-cell.stage-pass strong { color: var(--green); }
+.stage-cell.stage-pending strong { color: var(--yellow); }
 .advice-cell { min-width: 225px; max-width: 275px; text-align: left !important; white-space: normal !important; vertical-align: top; }
 .advice-cell strong { display: block; font-family: var(--display); font-size: 11px; font-weight: 500; }
 .advice-cell small { display: block; margin-top: 5px; color: var(--muted); font: 8px/1.45 var(--mono); }
@@ -52,6 +92,10 @@
   .table-controls { flex-wrap: wrap; }
   .table-controls .table-search { flex: 1 1 100%; }
   .table-count { margin-left: 0; }
+  .deduction-flow { flex-wrap: wrap; }
+  .deduction-flow > div { flex: 1 1 28%; }
+  .deduction-flow i { display: none; }
+  .analysis-charts { grid-template-columns: 1fr; }
 }
 @media (max-width: 700px) {
   .table-intro { display: block; padding: 21px 17px; }
@@ -63,4 +107,8 @@
   .table-controls .table-search { grid-column: 1 / -1; }
   .table-count { grid-column: 1 / -1; padding: 5px 0 0; }
   .table-scroll { max-height: none; min-height: 460px; }
+  .deduction-board { padding: 19px 17px 16px; }
+  .deduction-heading { display: block; }
+  .deduction-stamp { margin-top: 15px; }
+  .deduction-flow > div { flex-basis: 45%; }
 }

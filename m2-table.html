@@ -57,6 +57,36 @@
           <article><span>今日上涨</span><strong id="summaryUp">—</strong><small>导出时点涨跌幅</small></article>
         </section>
 
+        <section class="deduction-board" aria-label="数据推演">
+          <div class="deduction-heading">
+            <div>
+              <div class="section-kicker">DATA DEDUCTION</div>
+              <h2>从均线资格到买点确认</h2>
+              <p>先看 Excel 能证明什么，再把不能证明的部分留给图形复核。这里的“阶段 2 初筛”只表示价格与均线关系通过，不等于已经确认买点。</p>
+            </div>
+            <div class="deduction-stamp"><span>推演基准</span><strong>8-5 早盘快照</strong><small>37 只 · 21 个字段</small></div>
+          </div>
+          <div class="deduction-flow" aria-label="筛选推演路径">
+            <div><small>01 / 导入</small><strong id="flowTotal">—</strong><span>候选股票</span></div>
+            <i>→</i>
+            <div><small>02 / 均线</small><strong id="flowStacked">—</strong><span>MA50 &gt; MA150 &gt; MA200</span></div>
+            <i>→</i>
+            <div><small>03 / 趋势</small><strong id="flowAbove200">—</strong><span>价格站上 MA200</span></div>
+            <i>→</i>
+            <div><small>04 / 位置</small><strong id="flowNearHigh">—</strong><span>距区间高点 ≤ 10%</span></div>
+            <i>→</i>
+            <div><small>05 / 建议</small><strong id="flowPriority">—</strong><span>突破确认后考虑</span></div>
+            <i>→</i>
+            <div class="flow-pending"><small>06 / 买点</small><strong id="flowConfirmed">—</strong><span>Pivot / 收缩 / 量能</span></div>
+          </div>
+          <div class="analysis-charts">
+            <article class="analysis-panel"><div class="analysis-panel-head"><span>建议分层</span><small>当前快照</small></div><div id="adviceChart" class="bar-chart"></div></article>
+            <article class="analysis-panel"><div class="analysis-panel-head"><span>接近区间高点</span><small>越接近右侧越强</small></div><div id="highChart" class="bar-chart"></div></article>
+            <article class="analysis-panel"><div class="analysis-panel-head"><span>价格相对 MA200</span><small>价格高于 MA200 的幅度</small></div><div id="maChart" class="bar-chart"></div></article>
+          </div>
+          <div class="deduction-note"><span class="footnote-mark">i</span><p>推演字段来自导入数据的可计算关系：价格与 MA50/150/200 的距离、均线之间的领先幅度、区间高低点位置和阶段涨幅。Excel 没有提供 MA200 斜率、Pivot、收缩次数、底部持续时间与突破成交量，所以这些项目不会被虚构成已确认。</p></div>
+        </section>
+
         <section class="table-controls" aria-label="表格筛选">
           <label class="table-search"><span>查找股票</span><input id="tableSearch" type="search" placeholder="代码或简称" /></label>
           <label><span>建议视图</span><select id="tableFilter"><option value="all">全部导入股票</option><option value="priority">突破确认后考虑</option><option value="caution">不追当日大涨</option><option value="wait">等待平台 / 突破</option><option value="avoid">暂不建议买入</option><option value="stacked">MA50 &gt; MA150 &gt; MA200</option><option value="nearHigh">距区间高点 ≤ 10%</option><option value="needsPivot">Pivot / 收缩待确认</option></select></label>
@@ -78,6 +108,8 @@
                   <th>MA150</th>
                   <th>MA200</th>
                   <th>均线结构</th>
+                  <th>均线距离推演<br /><small>相对值</small></th>
+                  <th>阶段推演</th>
                   <th>阶段涨幅<br /><small>7/9 → 8/5</small></th>
                   <th>距区间高点</th>
                   <th>从低点反弹</th>
