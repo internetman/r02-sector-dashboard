@@ -30,6 +30,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 13.7% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -61,6 +64,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "不追当日大涨",
+      "recommendationClass": "caution",
+      "recommendationReason": "趋势初筛通过且距区间高点 1.8%；导出时点单日涨幅较大，等待回踩或新平台。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -92,6 +98,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 27.9% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -123,6 +132,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 21.4% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -154,6 +166,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 15.4% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -185,6 +200,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 27.6% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -216,6 +234,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 13.1% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -247,6 +268,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 18.3% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -278,6 +302,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 18.8% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -309,6 +336,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 14.2% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -340,6 +370,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 15.0% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -371,6 +404,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 24.9% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -402,6 +438,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 23.1% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -433,6 +472,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 11.8% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -464,6 +506,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 18.0% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -495,6 +540,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 20.8% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -526,6 +574,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "突破确认后考虑",
+      "recommendationClass": "priority",
+      "recommendationReason": "趋势初筛通过且距区间高点 3.2%；仍需确认 Pivot、收缩和突破量。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -557,6 +608,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 21.0% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -588,6 +642,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "突破确认后考虑",
+      "recommendationClass": "priority",
+      "recommendationReason": "趋势初筛通过且距区间高点 1.8%；仍需确认 Pivot、收缩和突破量。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -619,6 +676,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "突破确认后考虑",
+      "recommendationClass": "priority",
+      "recommendationReason": "趋势初筛通过且距区间高点 8.8%；仍需确认 Pivot、收缩和突破量。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -650,6 +710,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 17.2% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -681,6 +744,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 19.0% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -712,6 +778,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 16.0% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -743,6 +812,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 11.4% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -774,6 +846,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 11.8% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -805,6 +880,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 17.6% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -836,6 +914,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 13.0% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -867,6 +948,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 18.8% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -898,6 +982,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "突破确认后考虑",
+      "recommendationClass": "priority",
+      "recommendationReason": "趋势初筛通过且距区间高点 3.8%；仍需确认 Pivot、收缩和突破量。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -929,6 +1016,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 16.6% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -960,6 +1050,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "突破确认后考虑",
+      "recommendationClass": "priority",
+      "recommendationReason": "趋势初筛通过且距区间高点 5.8%；仍需确认 Pivot、收缩和突破量。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -991,6 +1084,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 16.9% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -1022,6 +1118,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 11.3% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -1053,6 +1152,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 25.4% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -1084,6 +1186,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "突破确认后考虑",
+      "recommendationClass": "priority",
+      "recommendationReason": "趋势初筛通过且距区间高点 8.9%；仍需确认 Pivot、收缩和突破量。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -1115,6 +1220,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 21.8% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"
@@ -1146,6 +1254,9 @@ window.M2_TABLE_DATA = {
       "maStacked": true,
       "aboveMa50": true,
       "aboveMa200": true,
+      "recommendation": "等待平台/突破",
+      "recommendationClass": "wait",
+      "recommendationReason": "趋势初筛通过，但距区间高点 15.8% 仍较远；暂无可确认买点。",
       "pivot": "待确认",
       "pivotReason": "i问财导出未包含 Pivot；需结合图形和历史 OHLCV 核验",
       "contractions": "待确认"

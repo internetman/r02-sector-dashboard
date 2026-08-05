@@ -53,13 +53,13 @@
           <article><span>导入股票</span><strong id="summaryTotal">—</strong><small>本次快照</small></article>
           <article><span>均线顺序</span><strong id="summaryStacked">—</strong><small>MA50 &gt; MA150 &gt; MA200</small></article>
           <article><span>站上 MA200</span><strong id="summaryAbove200">—</strong><small>仅是资格，不是买点</small></article>
-          <article><span>接近区间高点</span><strong id="summaryNearHigh">—</strong><small>距高点不超过 10%</small></article>
+          <article><span>重点关注建议</span><strong id="summaryNearHigh">—</strong><small>突破确认后考虑，不是立即买入</small></article>
           <article><span>今日上涨</span><strong id="summaryUp">—</strong><small>导出时点涨跌幅</small></article>
         </section>
 
         <section class="table-controls" aria-label="表格筛选">
           <label class="table-search"><span>查找股票</span><input id="tableSearch" type="search" placeholder="代码或简称" /></label>
-          <label><span>资格视图</span><select id="tableFilter"><option value="all">全部导入股票</option><option value="stacked">MA50 &gt; MA150 &gt; MA200</option><option value="nearHigh">距区间高点 ≤ 10%</option><option value="needsPivot">Pivot / 收缩待确认</option></select></label>
+          <label><span>建议视图</span><select id="tableFilter"><option value="all">全部导入股票</option><option value="priority">突破确认后考虑</option><option value="caution">不追当日大涨</option><option value="wait">等待平台 / 突破</option><option value="avoid">暂不建议买入</option><option value="stacked">MA50 &gt; MA150 &gt; MA200</option><option value="nearHigh">距区间高点 ≤ 10%</option><option value="needsPivot">Pivot / 收缩待确认</option></select></label>
           <label><span>排序</span><select id="tableSort"><option value="pct">今日涨跌幅</option><option value="fromHigh">距离区间高点</option><option value="fromLow">从区间低点反弹</option><option value="amount">平均成交额</option><option value="price">现价</option></select></label>
           <div class="table-count"><strong id="visibleCount">—</strong><span>行可见</span></div>
         </section>
@@ -71,6 +71,7 @@
                 <tr>
                   <th>#</th>
                   <th class="sticky-name">股票</th>
+                  <th>M2 建议<br /><small>只作筛选参考</small></th>
                   <th>现价</th>
                   <th>今日涨跌</th>
                   <th>MA50</th>
@@ -91,7 +92,7 @@
               <tbody id="tableBody"></tbody>
             </table>
           </div>
-          <div class="table-footnote"><span class="footnote-mark">!</span><p>表格中的“均线结构”只代表导出时点的数值关系；它不能单独证明股票处于第二阶段。Pivot、收缩次数和买点必须结合图形、平台持续时间、波动收窄和突破量能复核。</p></div>
+          <div class="table-footnote"><span class="footnote-mark">!</span><p>“M2 建议”只按导入快照做候选分层，不是自动下单信号。均线结构不能单独证明股票处于第二阶段；Pivot、收缩次数和买点必须结合图形、平台持续时间、波动收窄和突破量能复核，最终买不买由你决定。</p></div>
         </section>
 
         <footer class="page-footer">M2 / 导入表负责横向筛选 · 卡片页负责候选足迹 · R02 负责板块环境 <a class="footer-link" href="/">返回 M2 首页 ↗</a></footer>

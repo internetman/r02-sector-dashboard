@@ -37,6 +37,13 @@
 .ma-warn { color: var(--yellow); }
 .near-high { color: var(--orange); }
 .pivot-pending, .contraction-pending { color: var(--yellow); }
+.advice-cell { min-width: 225px; max-width: 275px; text-align: left !important; white-space: normal !important; vertical-align: top; }
+.advice-cell strong { display: block; font-family: var(--display); font-size: 11px; font-weight: 500; }
+.advice-cell small { display: block; margin-top: 5px; color: var(--muted); font: 8px/1.45 var(--mono); }
+.advice-cell.priority strong { color: var(--green); }
+.advice-cell.caution strong { color: var(--orange); }
+.advice-cell.wait strong { color: var(--blue); }
+.advice-cell.avoid strong { color: var(--red); }
 .table-footnote { display: flex; gap: 10px; align-items: flex-start; padding: 14px 17px; border-top: 1px solid var(--line); color: var(--muted); }
 .table-footnote p { font-size: 10px; line-height: 1.6; }
 .footnote-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; flex: 0 0 auto; border: 1px solid var(--yellow); color: var(--yellow); font: 10px var(--mono); }

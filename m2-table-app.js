@@ -17,7 +17,7 @@
   $("summaryTotal").textContent = data.rowCount;
   $("summaryStacked").textContent = data.rows.filter((row) => row.maStacked).length;
   $("summaryAbove200").textContent = data.rows.filter((row) => row.aboveMa200).length;
-  $("summaryNearHigh").textContent = data.rows.filter((row) => row.fromHighPct >= -10).length;
+  $("summaryNearHigh").textContent = data.rows.filter((row) => row.recommendationClass === "priority").length;
   $("summaryUp").textContent = data.rows.filter((row) => row.pct > 0).length;
 
   const getRows = () => {
@@ -29,6 +29,10 @@
       const matchesFilter = filter === "all"
         || (filter === "stacked" && row.maStacked)
         || (filter === "nearHigh" && row.fromHighPct >= -10)
+        || (filter === "priority" && row.recommendationClass === "priority")
+        || (filter === "caution" && row.recommendationClass === "caution")
+        || (filter === "wait" && row.recommendationClass === "wait")
+        || (filter === "avoid" && row.recommendationClass === "avoid")
         || filter === "needsPivot";
       return matchesSearch && matchesFilter;
     });
@@ -49,6 +53,7 @@
       <tr>
         <td>${String(index + 1).padStart(2, "0")}</td>
         <td class="sticky-name name-cell"><strong>${row.name}</strong><small>${row.code} · ${row.exchange}</small></td>
+        <td class="advice-cell ${row.recommendationClass}" title="${row.recommendationReason}"><strong>${row.recommendation}</strong><small>${row.recommendationReason}</small></td>
         <td>${price(row.price)}</td>
         <td class="${row.pct >= 0 ? "pct-up" : "pct-down"}">${pct(row.pct)}</td>
         <td>${price(row.ma50)}</td>

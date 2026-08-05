@@ -52,6 +52,7 @@
         <div><span>为什么是这个突破点</span><strong>${item.pivotReason}</strong></div>
         <div><span>阶段证据</span><strong>${item.stageReason}</strong></div>
       </div>
+      <div class="recommendation-band ${item.adviceClass || "wait"}"><span>M2 建议</span><strong>${item.advice || "等待进一步确认"}</strong><small>${item.adviceReason || "需结合 Pivot、收缩和突破量复核。"}</small></div>
       <div class="footprint-grid">
         <div><span>底部时间</span><strong>${item.baseAge}</strong></div>
         <div><span>收缩次数</span><strong>${item.contractions}</strong></div>
