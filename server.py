@@ -75,6 +75,7 @@ M2_WATCHLIST = [
 
 _cache: dict[str, Any] = {"ts": 0.0, "payload": None}
 _m2_quote_cache: dict[str, Any] = {"ts": 0.0, "payload": None}
+_m2_history_cache: dict[str, Any] = {"ts": 0.0, "payload": None}
 _trend_cache: dict[str, dict[str, Any]] = {}
 _sector_rank_cache: dict[str, Any] = {"ts": 0.0, "updatedAt": None, "rows": []}
 
@@ -260,6 +261,176 @@ def get_m2_watchlist_payload(force: bool = False) -> dict[str, Any]:
             "quotes": [],
             "warnings": [f"行情源暂时失败：{exc}"],
         }
+
+
+def _avg_field(rows: list[dict[str, Any]], field: str) -> float | None:
+    values = [num(row.get(field)) for row in rows]
+    values = [value for value in values if value is not None]
+    return sum(values) / len(values) if values else None
+
+
+def _range_pct(rows: list[dict[str, Any]]) -> float | None:
+    highs = [num(row.get("high")) for row in rows]
+    lows = [num(row.get("low")) for row in rows]
+    highs = [value for value in highs if value is not None]
+    lows = [value for value in lows if value is not None]
+    if not highs or not lows or max(highs) <= 0:
+        return None
+    return (max(highs) - min(lows)) / max(highs) * 100
+
+
+def _get_m2_history(item: dict[str, Any]) -> dict[str, Any]:
+    today = dt.date.today()
+    # 需要至少 200 个交易日的预热数据，避免图表前段出现断裂的 MA200。
+    begin = (today - dt.timedelta(days=650)).strftime("%Y%m%d")
+    end = today.strftime("%Y%m%d")
+    url = (
+        "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+        f"?secid={item['market']}.{urllib.parse.quote(item['code'])}"
+        "&fields1=f1,f2,f3,f4,f5,f6"
+        "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
+        f"&ut={EASTMONEY_UT}&klt=101&fqt=1&beg={begin}&end={end}&lmt=500"
+    )
+    payload = fetch_eastmoney_json(url)
+    raw_rows = payload.get("data", {}).get("klines") or []
+    rows: list[dict[str, Any]] = []
+    for raw in raw_rows:
+        parts = raw.split(",")
+        if len(parts) < 11:
+            continue
+        rows.append(
+            {
+                "date": parts[0],
+                "open": num(parts[1]),
+                "close": num(parts[2]),
+                "high": num(parts[3]),
+                "low": num(parts[4]),
+                "volume": num(parts[5]),
+                "amountYi": money_yi(num(parts[6])),
+                "amplitude": num(parts[7]),
+                "pct": num(parts[8]),
+                "change": num(parts[9]),
+                "turnover": num(parts[10]),
+            }
+        )
+    if len(rows) < 210:
+        raise FetchError(f"{item['code']} history returned only {len(rows)} rows")
+
+    for index, row in enumerate(rows):
+        for window, key in ((50, "ma50"), (150, "ma150"), (200, "ma200")):
+            if index + 1 >= window:
+                closes = [num(point.get("close")) for point in rows[index + 1 - window : index + 1]]
+                closes = [value for value in closes if value is not None]
+                row[key] = sum(closes) / len(closes) if len(closes) == window else None
+            else:
+                row[key] = None
+
+    contraction_windows = []
+    for window in (40, 20, 10):
+        if len(rows) < window * 2:
+            continue
+        previous = rows[-window * 2 : -window]
+        current = rows[-window:]
+        previous_range = _range_pct(previous)
+        current_range = _range_pct(current)
+        previous_volume = _avg_field(previous, "volume")
+        current_volume = _avg_field(current, "volume")
+        if (
+            previous_range is not None
+            and current_range is not None
+            and previous_volume
+            and current_volume
+            and current_range <= previous_range * 0.9
+            and current_volume <= previous_volume * 0.95
+        ):
+            contraction_windows.append(
+                {
+                    "window": window,
+                    "startDate": current[0]["date"],
+                    "endDate": current[-1]["date"],
+                    "rangePct": round(current_range, 2),
+                    "volumeRatio": round(current_volume / previous_volume, 2),
+                }
+            )
+
+    recent_five = rows[-5:]
+    prior_twenty = rows[-25:-5]
+    recent_volume = _avg_field(recent_five, "volume")
+    prior_volume = _avg_field(prior_twenty, "volume")
+    last_ma200 = num(rows[-1].get("ma200"))
+    prior_ma200 = num(rows[-21].get("ma200")) if len(rows) >= 21 else None
+    price_range_20 = _range_pct(rows[-20:])
+    base_highs = [num(row.get("high")) for row in rows[-40:]]
+    base_lows = [num(row.get("low")) for row in rows[-40:]]
+    base_highs = [value for value in base_highs if value is not None]
+    base_lows = [value for value in base_lows if value is not None]
+    base_depth = ((max(base_highs) - min(base_lows)) / max(base_highs) * 100) if base_highs and base_lows and max(base_highs) > 0 else None
+    if len(contraction_windows) >= 2:
+        vcp_status = "VCP 候选：价格与量能连续收缩"
+    elif len(contraction_windows) == 1:
+        vcp_status = "VCP 初步收缩：继续观察"
+    else:
+        vcp_status = "VCP 收缩未确认"
+
+    return {
+        "code": item["code"],
+        "name": item["name"],
+        "asOf": rows[-1]["date"],
+        "rows": rows[-160:],
+        "metrics": {
+            "baseDays": 40,
+            "baseDepthPct": round(base_depth, 2) if base_depth is not None else None,
+            "range20Pct": round(price_range_20, 2) if price_range_20 is not None else None,
+            "volumeDryUpRatio": round(recent_volume / prior_volume, 2) if recent_volume and prior_volume else None,
+            "ma200SlopePct20d": round((last_ma200 / prior_ma200 - 1) * 100, 2) if last_ma200 and prior_ma200 else None,
+            "contractionCount": len(contraction_windows),
+            "contractions": contraction_windows,
+            "vcpStatus": vcp_status,
+        },
+    }
+
+
+def get_m2_history_payload(force: bool = False) -> dict[str, Any]:
+    now = time.time()
+    if not force and _m2_history_cache["payload"] and now - _m2_history_cache["ts"] < 600:
+        cached = json.loads(json.dumps(_m2_history_cache["payload"], ensure_ascii=False))
+        cached["cacheAgeSeconds"] = round(now - _m2_history_cache["ts"])
+        return cached
+
+    generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    history: dict[str, Any] = {}
+    warnings: list[str] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(API_WORKERS, len(M2_WATCHLIST))) as executor:
+        future_map = {executor.submit(_get_m2_history, item): item for item in M2_WATCHLIST}
+        for future in concurrent.futures.as_completed(future_map):
+            item = future_map[future]
+            try:
+                history[item["code"]] = future.result()
+            except Exception as exc:
+                warnings.append(f"{item['name']} 动态日K失败：{exc}")
+
+    source_status = "live" if len(history) == len(M2_WATCHLIST) else ("partial" if history else "unavailable")
+    payload = {
+        "generatedAt": generated_at,
+        "cacheTtlSeconds": 600,
+        "cacheAgeSeconds": 0,
+        "sourceStatus": source_status,
+        "source": "Eastmoney push2his/push2delay daily adjusted OHLCV",
+        "history": history,
+        "warnings": warnings,
+    }
+    if history:
+        _m2_history_cache["ts"] = now
+        _m2_history_cache["payload"] = payload
+        return payload
+    cached_payload = _m2_history_cache.get("payload")
+    if cached_payload:
+        stale = json.loads(json.dumps(cached_payload, ensure_ascii=False))
+        stale["sourceStatus"] = "stale"
+        stale["cacheAgeSeconds"] = round(now - _m2_history_cache["ts"])
+        stale["warnings"] = warnings + ["动态日K源暂时失败，沿用上次成功数据。"]
+        return stale
+    return payload
 
 
 def get_sector_rank(limit: int = 20) -> list[dict[str, Any]]:
@@ -729,6 +900,11 @@ class Handler(BaseHTTPRequestHandler):
             params = urllib.parse.parse_qs(parsed.query)
             force = params.get("force", ["0"])[0] == "1"
             self.serve_json(get_m2_watchlist_payload(force=force))
+            return
+        if parsed.path == "/api/m2-history":
+            params = urllib.parse.parse_qs(parsed.query)
+            force = params.get("force", ["0"])[0] == "1"
+            self.serve_json(get_m2_history_payload(force=force))
             return
         self.send_error(404, "Not found")
 

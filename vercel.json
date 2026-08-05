@@ -11,6 +11,9 @@
     },
     "api/m2-watchlist.py": {
       "maxDuration": 10
+    },
+    "api/m2-history.py": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
@@ -21,6 +24,10 @@
     {
       "source": "/api/m2-watchlist",
       "destination": "/api/m2-watchlist.py"
+    },
+    {
+      "source": "/api/m2-history",
+      "destination": "/api/m2-history.py"
     },
     {
       "source": "/m2-table",

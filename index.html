@@ -36,6 +36,7 @@
           <div class="topbar-meta">
             <div class="last-sync"><span class="live-dot"></span><span id="lastSync">结构快照读取中</span></div>
             <div class="quote-sync" id="quoteSync">个股行情同步中…</div>
+            <div class="history-sync" id="historySync">动态日K同步中…</div>
             <a class="radar-link" href="/radar">R02 板块雷达 <span>↗</span></a>
             <button class="refresh-button" type="button" onclick="window.location.reload()">刷新数据 <span>↗</span></button>
           </div>
@@ -119,12 +120,10 @@
         <button class="modal-close" type="button" aria-label="关闭">×</button>
         <div class="section-kicker">CHART EVIDENCE</div>
         <h2 id="modalTitle">—</h2>
-        <div class="modal-image-frame">
-          <img id="modalImage" src="" alt="" />
-        </div>
+        <div class="modal-image-frame" id="modalChart"></div>
         <div class="modal-actions">
-          <a id="modalOpenOriginal" class="modal-open-link" href="#" target="_blank" rel="noopener">在新标签页打开高清图 ↗</a>
-          <span>手机端可双指放大</span>
+          <span id="modalSource">动态 OHLCV · MA50 / MA150 / MA200 · VCP 收缩候选</span>
+          <span>数据源失败时会明确显示，不使用旧截图冒充实时图形</span>
         </div>
       </div>
     </div>

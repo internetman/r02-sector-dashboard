@@ -11,7 +11,7 @@
 - Vercel 绑定仓库：`https://github.com/internetman/blackhorse-quant.git`
 - 生产域名：`https://www.heimaq.com/`
 - Vercel 默认域名：`https://blackhorse-quant.vercel.app/`
-- API：`/api/dashboard`、`/api/m2-watchlist`
+- API：`/api/dashboard`、`/api/m2-watchlist`、`/api/m2-history`
 
 当前部署方式是：先维护源码仓库，再同步同一套文件到 `internetman/blackhorse-quant` 的 `main` 分支；Vercel 已绑定 `blackhorse-quant`，push 后会自动生产部署。
 
@@ -79,11 +79,14 @@ handoff/website-sync/verify-production.sh
 - M2 静态资源：`m2-styles.css`、`m2-data.js`、`m2-app.js`、`m2-assets/`
 - Vercel Python Serverless Function：`api/dashboard.py`
 - M2 行情 Serverless Function：`api/m2-watchlist.py`
+- M2 动态日K Serverless Function：`api/m2-history.py`
 - 共享抓取逻辑：`server.py`
 - Vercel 配置：`vercel.json`
 - 无 npm / pip 依赖；当前只用 Python 标准库。
 
 M2 建议只提供候选分层，不替用户下单：`突破确认后考虑`、`不追当日大涨`、`等待平台/突破`、`暂不建议买入`。导入表的建议基于带时间的快照；Pivot、收缩次数、底部时间和突破量仍需历史 OHLCV 与图形复核。
+
+首页候选卡不再依赖截图作为实时图形来源；点击“动态 VCP 图”会查看由复权日K、成交量、MA50/150/200、候选 Pivot 和算法收缩区绘制的图形。`m2-assets/` 中的旧图片仅保留为历史存档。
 
 行情源：
 
@@ -98,6 +101,7 @@ M2 建议只提供候选分层，不替用户下单：`突破确认后考虑`、
 刷新与缓存：
 
 - M2 候选股行情自动刷新：5 分钟
+- M2 动态日K、均线与 VCP 初筛自动刷新：10 分钟
 - R02 雷达页面自动刷新：30 分钟
 - 手动按钮：强制刷新
 - 服务端短缓存：45 秒
