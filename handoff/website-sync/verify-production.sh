@@ -12,9 +12,13 @@ urls = [
 
 for url in urls:
     print(f"\n{url}")
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=30) as response:
-        data = json.loads(response.read().decode("utf-8"))
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        print("unavailable:", exc)
+        continue
 
     top5 = data.get("top5") or []
     status = data.get("sectorRankStatus") or {}
