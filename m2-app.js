@@ -41,7 +41,7 @@
       </div>
       <button class="chart-thumb" type="button" data-chart="${item.chart}" data-name="${item.name} ${item.code}">
         <img src="${item.chart}" alt="${item.name} 日K图" loading="lazy" />
-        <span>查看日K图 <b>↗</b></span>
+        <span>查看高清日K图 <b>↗</b></span>
       </button>
       <div class="stock-action"><span class="action-mark">↳</span><p>${item.action}</p></div>
       <div class="stock-note">${item.note}</div>
@@ -55,6 +55,7 @@
   const modal = $("chartModal");
   const modalImage = $("modalImage");
   const modalTitle = $("modalTitle");
+  const modalOpenOriginal = $("modalOpenOriginal");
   const closeModal = () => {
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
@@ -64,6 +65,7 @@
       modalImage.src = button.dataset.chart;
       modalImage.alt = `${button.dataset.name} 日K图`;
       modalTitle.textContent = button.dataset.name;
+      modalOpenOriginal.href = button.dataset.chart;
       modal.classList.add("open");
       modal.setAttribute("aria-hidden", "false");
     });
