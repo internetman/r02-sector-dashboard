@@ -60,7 +60,7 @@ m2-table.css        # 表格页与推演图形样式
 m2-snapshot.json    # 本地 Session 生成的 M2 选股日K与 VCP 快照
 server.py           # 本地服务 + 共享数据抓取逻辑
 api/dashboard.py    # Vercel Python Serverless Function
-api/m2-watchlist.py # M2 候选股实时行情接口
+api/m2-watchlist.py # M2 已发布报价接口；dynamic=1 时才抓实时行情
 api/m2-history.py   # M2 已发布快照接口；dynamic=1 时才动态抓取日K
 vercel.json         # Other 框架、空构建命令、根目录静态输出、API 路由
 ```
@@ -71,7 +71,7 @@ Vercel 上的访问路径：
 - `/radar`：原 R02 板块雷达
 - `/m2-table`：M2 待观察股票池
 - `/api/dashboard`：实时数据 JSON
-- `/api/m2-watchlist`：M2 候选股实时价格与日涨跌 JSON
+- `/api/m2-watchlist`：默认返回已发布收盘报价；`?dynamic=1` 才抓实时价格与日涨跌 JSON
 - `/api/m2-history`：默认返回已发布的 `m2-snapshot.json`；`?dynamic=1` 才动态抓取复权日K
 - `/m2-snapshot.json`：网页正常读取的本地 Session 快照；打开网页不再等待逐只历史行情请求
 

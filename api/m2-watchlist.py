@@ -10,15 +10,16 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from server import get_m2_watchlist_payload
+from server import get_m2_watchlist_payload, get_m2_watchlist_snapshot_payload
 
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
+        dynamic = params.get("dynamic", ["0"])[0] == "1"
         force = params.get("force", ["0"])[0] == "1"
-        payload = get_m2_watchlist_payload(force=force)
+        payload = get_m2_watchlist_payload(force=force) if dynamic else get_m2_watchlist_snapshot_payload()
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
         self.send_response(200)

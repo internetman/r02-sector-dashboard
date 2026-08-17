@@ -87,7 +87,7 @@ handoff/website-sync/verify-production.sh
 - R02 雷达页：`/radar`（源码文件：`radar.html`）
 - M2 静态资源：`m2-styles.css`、`m2-data.js`、`m2-app.js`、`m2-assets/`
 - Vercel Python Serverless Function：`api/dashboard.py`
-- M2 行情 Serverless Function：`api/m2-watchlist.py`
+- M2 行情 Serverless Function：`api/m2-watchlist.py`（默认读已发布收盘报价，`dynamic=1` 才实时抓取）
 - M2 快照 Serverless Function：`api/m2-history.py`（默认读 `m2-snapshot.json`，`dynamic=1` 才动态抓取日K）
 - M2 本地快照脚本：`handoff/website-sync/capture-m2-snapshot.py`
 - M2 一键抓取并发布：`handoff/website-sync/refresh-m2-site.sh`
@@ -114,6 +114,7 @@ M2 建议只提供候选分层，不替用户下单：`突破确认后考虑`、
 - M2 选股快照：建议收盘后 15:30–16:00 由本地 Session 生成并推送
 - M2 快照有效期：36 小时；网页过期后明确标注
 - 网页检查新快照：30 分钟
+- API 候选股行情：`/api/m2-watchlist` 默认读已发布收盘报价；`dynamic=1` 才实时抓取
 - API 动态日K：`/api/m2-history` 默认读已发布快照；`dynamic=1` 仅作为本地排障和快照首次生成兜底
 - R02 雷达页面自动刷新：30 分钟
 - 手动按钮：强制刷新

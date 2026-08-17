@@ -321,6 +321,37 @@ def get_m2_watchlist_payload(force: bool = False) -> dict[str, Any]:
         }
 
 
+def get_m2_watchlist_snapshot_payload() -> dict[str, Any]:
+    snapshot_path = ROOT / "m2-snapshot.json"
+    generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    try:
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "generatedAt": generated_at,
+            "cacheTtlSeconds": CACHE_TTL_SECONDS,
+            "cacheAgeSeconds": 0,
+            "sourceStatus": "unavailable",
+            "source": "published m2-snapshot.json quotes",
+            "quotes": [],
+            "warnings": [f"M2 静态行情快照读取失败：{exc}"],
+            "endpointMode": "snapshot",
+        }
+
+    quotes = snapshot.get("quotes") or []
+    return {
+        "generatedAt": snapshot.get("quoteGeneratedAt") or snapshot.get("generatedAt") or generated_at,
+        "cacheTtlSeconds": CACHE_TTL_SECONDS,
+        "cacheAgeSeconds": 0,
+        "sourceStatus": snapshot.get("sourceStatus") or ("live" if quotes else "unavailable"),
+        "source": snapshot.get("quoteSource") or "published m2-snapshot.json quotes",
+        "quotes": quotes if isinstance(quotes, list) else [],
+        "warnings": list(snapshot.get("warnings") or []),
+        "endpointMode": "snapshot",
+        "asOf": snapshot.get("asOf"),
+    }
+
+
 def _avg_field(rows: list[dict[str, Any]], field: str) -> float | None:
     values = [num(row.get(field)) for row in rows]
     values = [value for value in values if value is not None]
@@ -1148,8 +1179,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/m2-watchlist":
             params = urllib.parse.parse_qs(parsed.query)
+            dynamic = params.get("dynamic", ["0"])[0] == "1"
             force = params.get("force", ["0"])[0] == "1"
-            self.serve_json(get_m2_watchlist_payload(force=force))
+            payload = get_m2_watchlist_payload(force=force) if dynamic else get_m2_watchlist_snapshot_payload()
+            self.serve_json(payload)
             return
         if parsed.path == "/api/m2-history":
             params = urllib.parse.parse_qs(parsed.query)
