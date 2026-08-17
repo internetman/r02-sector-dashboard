@@ -49,21 +49,21 @@ for url in quote_urls:
     if not quotes:
         raise RuntimeError("M2 watchlist quote endpoint returned no quotes")
 
-history_urls = [
-    "https://www.heimaq.com/api/m2-history?force=1",
-    "https://blackhorse-quant.vercel.app/api/m2-history?force=1",
+snapshot_urls = [
+    "https://www.heimaq.com/m2-snapshot.json",
+    "https://blackhorse-quant.vercel.app/m2-snapshot.json",
 ]
 
-for url in history_urls:
+for url in snapshot_urls:
     print(f"\n{url}")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=35) as response:
         data = json.loads(response.read().decode("utf-8"))
     history = data.get("history") or {}
     row_counts = [len(item.get("rows") or []) for item in history.values()]
-    print("sourceStatus:", data.get("sourceStatus"), "stocks:", len(history), "rows:", row_counts[:3])
+    print("asOf:", data.get("asOf"), "sourceStatus:", data.get("sourceStatus"), "stocks:", len(history), "max rows:", max(row_counts or [0]))
     if not history or max(row_counts or [0]) < 100:
-        raise RuntimeError("M2 history endpoint returned insufficient OHLCV data")
+        raise RuntimeError("M2 static snapshot returned insufficient OHLCV data")
 
 pages = [
     ("https://www.heimaq.com/", "Mark Minervini 2"),

@@ -3,17 +3,24 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import http.client
 import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import server  # noqa: E402
+
 TABLE_DATA = ROOT / "m2-table-data.js"
 OUTPUT = ROOT / "m2-sector-map.js"
 EASTMONEY_UT = "fa5fd1943c7b386f172d6893dbfba10b"
@@ -69,9 +76,9 @@ def fetch_stock_sector(code: str, name: str) -> dict[str, Any]:
         },
     )
     last_error: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(2):
         try:
-            with urllib.request.urlopen(request, timeout=15) as response:
+            with urllib.request.urlopen(request, timeout=8) as response:
                 payload = json.load(response)
             break
         except (urllib.error.URLError, TimeoutError, http.client.RemoteDisconnected, json.JSONDecodeError) as error:
@@ -95,6 +102,24 @@ def fetch_stock_sector(code: str, name: str) -> dict[str, Any]:
         "region": region or "地域待补",
         "concepts": concepts[:12],
         "sectorGroup": sector_group(industry or "", concepts),
+    }
+
+
+def fetch_batch_industries(items: list[tuple[str, str]]) -> dict[str, str]:
+    if not items:
+        return {}
+    fields = "f12,f14,f100"
+    secids = ",".join(f"{market_for(code)}.{bare(code)}" for code, _ in items)
+    url = (
+        "https://push2.eastmoney.com/api/qt/ulist.np/get"
+        f"?fltt=2&invt=2&fields={fields}&secids="
+        + urllib.parse.quote(secids, safe=".,")
+    )
+    payload = server.fetch_eastmoney_json(url)
+    return {
+        str(row.get("f12")): str(row.get("f100"))
+        for row in (payload.get("data") or {}).get("diff") or []
+        if row.get("f12") and row.get("f100") not in (None, "", "-")
     }
 
 
@@ -134,17 +159,29 @@ def sector_group(industry: str, concepts: list[str]) -> str:
 
 
 def main() -> None:
-    mapping: dict[str, dict[str, Any]] = {}
+    watchlist = load_watchlist()
     existing = load_existing_items()
+    fetched: dict[str, dict[str, Any]] = {}
     failures: list[str] = []
-    for index, (code, name) in enumerate(load_watchlist(), start=1):
-        item = existing.get(code) or existing.get(bare(code))
-        if not item or item.get("industry") == "行业待补":
+
+    missing = [
+        (code, name)
+        for code, name in watchlist
+        if not (existing.get(code) or existing.get(bare(code)))
+        or (existing.get(code) or existing.get(bare(code))).get("industry") == "行业待补"
+    ]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        future_map = {
+            executor.submit(fetch_stock_sector, code, name): (code, name)
+            for code, name in missing
+        }
+        for future in concurrent.futures.as_completed(future_map):
+            code, name = future_map[future]
             try:
-                item = fetch_stock_sector(code, name)
+                fetched[code] = future.result()
             except (urllib.error.URLError, TimeoutError, http.client.RemoteDisconnected, json.JSONDecodeError, RuntimeError) as error:
                 failures.append(f"{code}:{error}")
-                item = {
+                fetched[code] = {
                     "code": code,
                     "symbol": bare(code),
                     "name": name,
@@ -153,18 +190,42 @@ def main() -> None:
                     "concepts": [],
                     "sectorGroup": "其它主题",
                 }
+
+    unresolved = [
+        (code, name)
+        for code, name in missing
+        if fetched[code].get("industry") == "行业待补"
+    ]
+    try:
+        batch_industries = fetch_batch_industries(unresolved)
+    except Exception as error:
+        print(f"warning: batch industry fallback failed: {error}", file=sys.stderr)
+        batch_industries = {}
+    resolved_codes = set()
+    for code, _ in unresolved:
+        industry = batch_industries.get(bare(code))
+        if industry:
+            fetched[code]["industry"] = industry
+            fetched[code]["sectorGroup"] = sector_group(industry, [])
+            resolved_codes.add(code)
+    failures = [item for item in failures if item.split(":", 1)[0] not in resolved_codes]
+
+    mapping: dict[str, dict[str, Any]] = {}
+    for code, name in watchlist:
+        item = existing.get(code) or existing.get(bare(code))
+        if not item or item.get("industry") == "行业待补":
+            item = fetched[code]
         else:
             item = dict(item)
             item["sectorGroup"] = sector_group(str(item.get("industry") or ""), list(item.get("concepts") or []))
         mapping[code] = item
         mapping[bare(code)] = item
-        time.sleep(0.15)
 
     payload = {
         "source": "Eastmoney stock/get fields f127 industry, f128 region, f129 concepts",
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-        "rowCount": len({code for code, _ in load_watchlist()}),
-        "failures": failures[:20],
+        "rowCount": len({code for code, _ in watchlist}),
+        "failures": sorted(failures)[:20],
         "items": mapping,
     }
     OUTPUT.write_text("window.M2_SECTOR_MAP = " + js(payload) + ";\n", encoding="utf-8")

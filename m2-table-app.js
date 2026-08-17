@@ -120,11 +120,15 @@
 
   $("tableAsOf").textContent = data.quoteGeneratedAt ? `监控报价 ${data.asOf}` : `导入快照 ${data.asOf}`;
   $("tableSource").textContent = data.source;
+  $("summaryQualifiedLabel").textContent = `${data.selectionAsOf}仍过硬条件`;
+  $("deductionAsOf").textContent = data.selectionAsOf;
+  $("flowCurrentLabel").textContent = `02 / ${data.closeLabel || "收盘"}`;
+  $("periodLabel").textContent = data.periodLabel || "近 20 日";
   $("summaryTotal").textContent = data.rowCount;
   $("summaryStacked").textContent = data.currentQualifiedCount || data.rows.filter((row) => row.currentQualified).length;
   $("summaryAbove200").textContent = data.rows.filter((row) => setupRating(row).stars >= 5).length;
   $("summaryNearHigh").textContent = data.nearPivotCount || 0;
-  $("summaryUp").textContent = data.rows.filter((row) => row.pct > 0).length;
+  $("summaryUp").textContent = data.upCount ?? data.rows.filter((row) => row.currentQualified && row.pct > 0).length;
 
   const populateSectorFilter = () => {
     const select = $("sectorFilter");
@@ -136,13 +140,12 @@
 
   const renderAnalysis = () => {
     const nearHigh = data.rows.filter((row) => row.fromHighPct >= -10).length;
-    const confirmed = data.rows.filter((row) => row.pivot && row.pivot !== "待确认" && row.contractions && row.contractions !== "待确认").length;
     $("flowTotal").textContent = data.priorCloseQualified || "—";
     $("flowStacked").textContent = data.importedCount || "—";
     $("flowAbove200").textContent = data.currentQualifiedCount || "—";
     $("flowNearHigh").textContent = data.newSinceClose || 0;
     $("flowPriority").textContent = data.rowCount;
-    $("flowConfirmed").textContent = data.rowCount - confirmed;
+    $("flowConfirmed").textContent = data.rows.filter((row) => !Number.isFinite(Number(row.rsRank))).length;
 
     const adviceRows = [
       { label: "5星 可执行", key: "star5", color: "priority" },

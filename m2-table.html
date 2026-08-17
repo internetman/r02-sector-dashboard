@@ -51,7 +51,7 @@
 
         <section class="table-summary" aria-label="导入表摘要">
           <article><span>观察池</span><strong id="summaryTotal">—</strong><small>持续记录</small></article>
-          <article><span>当前合格</span><strong id="summaryStacked">—</strong><small>8-17 收盘仍过硬条件</small></article>
+          <article><span>当前合格</span><strong id="summaryStacked">—</strong><small id="summaryQualifiedLabel">收盘仍过硬条件</small></article>
           <article><span>5星可执行</span><strong id="summaryAbove200">—</strong><small>全部条件满足</small></article>
           <article><span>贴近 Pivot</span><strong id="summaryNearHigh">—</strong><small>收盘重点盯</small></article>
           <article><span>今日上涨</span><strong id="summaryUp">—</strong><small>导出时点涨跌幅</small></article>
@@ -64,12 +64,12 @@
               <h2>从每日导出到执行星级</h2>
               <p>先记录该观察的股票，再按证据完整度给星级。5 星才代表可执行；4 星只是进入触发区，仍要等收盘、量能、止损和仓位确认。</p>
             </div>
-            <div class="deduction-stamp"><span>推演基准</span><strong>8-17 收盘</strong><small>观察池并集 · 自动更新</small></div>
+            <div class="deduction-stamp"><span>推演基准</span><strong id="deductionAsOf">收盘</strong><small>观察池并集 · 自动更新</small></div>
           </div>
           <div class="deduction-flow" aria-label="筛选推演路径">
             <div><small>01 / 旧池</small><strong id="flowTotal">—</strong><span>上一观察池</span></div>
             <i>→</i>
-            <div><small>02 / 8-17</small><strong id="flowStacked">—</strong><span>收盘有效行</span></div>
+            <div><small id="flowCurrentLabel">02 / 收盘</small><strong id="flowStacked">—</strong><span>收盘有效行</span></div>
             <i>→</i>
             <div><small>03 / 当前</small><strong id="flowAbove200">—</strong><span>仍满足硬条件</span></div>
             <i>→</i>
@@ -77,7 +77,7 @@
             <i>→</i>
             <div><small>05 / 观察池</small><strong id="flowPriority">—</strong><span>持续记录</span></div>
             <i>→</i>
-            <div class="flow-pending"><small>06 / 待补</small><strong id="flowConfirmed">—</strong><span>图形 / RS / Pivot</span></div>
+            <div class="flow-pending"><small>06 / 待补</small><strong id="flowConfirmed">—</strong><span>RS / 人工图形</span></div>
           </div>
           <div class="analysis-charts">
             <article class="analysis-panel"><div class="analysis-panel-head"><span>执行星级</span><small>当前快照</small></div><div id="adviceChart" class="bar-chart"></div></article>
@@ -118,7 +118,7 @@
                   <th>均线结构</th>
                   <th>均线距离推演<br /><small>相对值</small></th>
                   <th>阶段推演</th>
-                  <th>阶段涨幅<br /><small>7/16 → 8/12</small></th>
+                  <th>阶段涨幅<br /><small id="periodLabel">读取中</small></th>
                   <th>距区间高点</th>
                   <th>从低点反弹</th>
                   <th>均额<br /><small>元</small></th>

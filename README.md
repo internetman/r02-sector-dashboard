@@ -61,7 +61,7 @@ m2-snapshot.json    # 本地 Session 生成的 M2 选股日K与 VCP 快照
 server.py           # 本地服务 + 共享数据抓取逻辑
 api/dashboard.py    # Vercel Python Serverless Function
 api/m2-watchlist.py # M2 候选股实时行情接口
-api/m2-history.py   # M2 候选股复权日K、均线与 VCP 初筛接口
+api/m2-history.py   # M2 已发布快照接口；dynamic=1 时才动态抓取日K
 vercel.json         # Other 框架、空构建命令、根目录静态输出、API 路由
 ```
 
@@ -72,7 +72,7 @@ Vercel 上的访问路径：
 - `/m2-table`：M2 待观察股票池
 - `/api/dashboard`：实时数据 JSON
 - `/api/m2-watchlist`：M2 候选股实时价格与日涨跌 JSON
-- `/api/m2-history`：本地开发与首份快照生成用的 M2 动态复权日K接口
+- `/api/m2-history`：默认返回已发布的 `m2-snapshot.json`；`?dynamic=1` 才动态抓取复权日K
 - `/m2-snapshot.json`：网页正常读取的本地 Session 快照；打开网页不再等待逐只历史行情请求
 
 M2 的 `m2-data.js` 保存观察池摘要和结构判断快照；`m2-table-data.js` 保存按 M2-01 进入过观察池、且尚未人工确认失效的股票记录。每日导出不同，不能只展示当天 Excel 当前行；新合格股票加入观察池，前一日已合格但今日未出现或暂不合格的股票保留为“待复核观察”，确认趋势/结构失效后再移出。观察池会自动加入历史行情覆盖范围，并与 6 只核心历史档案取并集。`m2-snapshot.json` 由本地 Session 在收盘后统一抓取报价、日K、均线和 VCP 初筛结果，网页只负责读取和展示。快照超过 36 小时或只完成部分股票时会标记为“已过期 / 部分沿用”，不会把旧数据伪装成当天全量数据。

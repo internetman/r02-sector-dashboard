@@ -588,6 +588,38 @@ def _load_m2_snapshot_history() -> dict[str, Any]:
     return history if isinstance(history, dict) else {}
 
 
+def get_m2_snapshot_payload() -> dict[str, Any]:
+    snapshot_path = ROOT / "m2-snapshot.json"
+    generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    try:
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "generatedAt": generated_at,
+            "cacheTtlSeconds": 600,
+            "cacheAgeSeconds": 0,
+            "sourceStatus": "unavailable",
+            "source": "published m2-snapshot.json",
+            "barStatus": "snapshot",
+            "history": {},
+            "warnings": [f"M2 静态快照读取失败：{exc}"],
+            "reusedSnapshotCodes": [],
+            "endpointMode": "snapshot",
+        }
+
+    payload = dict(snapshot)
+    payload.setdefault("generatedAt", snapshot.get("generatedAt") or generated_at)
+    payload.setdefault("cacheTtlSeconds", 600)
+    payload["cacheAgeSeconds"] = 0
+    payload.setdefault("sourceStatus", "live" if payload.get("history") else "unavailable")
+    payload.setdefault("source", "published m2-snapshot.json")
+    payload.setdefault("barStatus", "snapshot")
+    payload.setdefault("warnings", [])
+    payload.setdefault("reusedSnapshotCodes", [])
+    payload["endpointMode"] = "snapshot"
+    return payload
+
+
 def get_m2_history_payload(force: bool = False, completed_only: bool = False) -> dict[str, Any]:
     cache = _m2_history_cache["completed" if completed_only else "live"]
     now = time.time()
@@ -1121,8 +1153,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/m2-history":
             params = urllib.parse.parse_qs(parsed.query)
+            dynamic = params.get("dynamic", ["0"])[0] == "1"
             force = params.get("force", ["0"])[0] == "1"
-            self.serve_json(get_m2_history_payload(force=force))
+            payload = get_m2_history_payload(force=force) if dynamic else get_m2_snapshot_payload()
+            self.serve_json(payload)
             return
         self.send_error(404, "Not found")
 

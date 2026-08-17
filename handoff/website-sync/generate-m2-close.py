@@ -11,6 +11,7 @@ import math
 import re
 import subprocess
 import sys
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Any
@@ -150,10 +151,39 @@ def fetch_quotes(codes: list[str]) -> tuple[dict[str, dict[str, Any]], str]:
 
 
 def fetch_history(item: dict[str, str], close_date: dt.date) -> dict[str, Any] | None:
+    for attempt in range(3):
+        try:
+            return server._get_m2_history(item, close_date)
+        except Exception:
+            if attempt < 2:
+                time.sleep(0.6 + attempt * 0.8)
+    return None
+
+
+def load_snapshot_history(path: Path) -> dict[str, dict[str, Any]]:
     try:
-        return server._get_m2_history(item, close_date)
-    except Exception:
-        return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    history = payload.get("history") if "history" in payload else payload
+    return history if isinstance(history, dict) else {}
+
+
+def load_committed_snapshot_history() -> dict[str, dict[str, Any]]:
+    try:
+        result = subprocess.run(
+            ["git", "show", "HEAD:m2-snapshot.json"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        payload = json.loads(result.stdout)
+    except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
+        return {}
+    history = payload.get("history")
+    return history if isinstance(history, dict) else {}
 
 
 def append_current_bar(
@@ -308,6 +338,8 @@ def classify(row: dict[str, Any], pivot: dict[str, Any], metrics: dict[str, Any]
     breakout = (price / pivot_price - 1) * 100 if price and pivot_price else None
     amount_ratio = row.get("amountRatio")
     contractions = int(metrics.get("contractionCount") or 0)
+    base_depth = finite(metrics.get("baseDepthPct"))
+    from_high = finite(row.get("fromHighPct"))
     price_to_ma50 = row.get("priceToMa50Pct")
     pct = finite(row.get("pct")) or 0
     if pct >= 8 or (price_to_ma50 is not None and price_to_ma50 > 25) or (distance is not None and distance < -6):
@@ -326,9 +358,13 @@ def classify(row: dict[str, Any], pivot: dict[str, Any], metrics: dict[str, Any]
         and breakout >= 0
         and breakout <= 3
         and (amount_ratio or 0) >= 1.3
-        and contractions >= 1
+        and contractions >= 2
+        and base_depth is not None
+        and base_depth <= 40
+        and from_high is not None
+        and from_high >= -25
         and (price_to_ma50 is None or price_to_ma50 <= 15)
-        and pct <= 7
+        and pct <= 5
     ):
         return {
             "recommendation": "5星可执行，收盘突破",
@@ -339,7 +375,17 @@ def classify(row: dict[str, Any], pivot: dict[str, Any], metrics: dict[str, Any]
             "action": "规则化触发已满足；下单前复核止损、仓位和盘口成交。",
             "buyRank": 120 - abs(distance) * 4 + (amount_ratio or 0) * 8 + contractions * 5,
         }
-    if distance is not None and -3 <= distance <= 3 and contractions >= 1 and (amount_ratio or 0) >= 0.8:
+    if (
+        distance is not None
+        and -3 <= distance <= 3
+        and contractions >= 2
+        and (amount_ratio or 0) >= 0.8
+        and base_depth is not None
+        and base_depth <= 40
+        and from_high is not None
+        and from_high >= -25
+        and pct <= 5
+    ):
         return {
             "recommendation": "买点候选，等确认",
             "className": "priority",
@@ -401,9 +447,23 @@ def main() -> int:
         default="",
         help="comma-separated previous close qualified codes, used when regenerating the same close snapshot",
     )
+    parser.add_argument(
+        "--prior-xlsx",
+        type=Path,
+        help="previous close iWencai export used to identify prior qualified codes",
+    )
+    parser.add_argument(
+        "--external-history-json",
+        type=Path,
+        help="optional code-keyed history JSON used when public history endpoints are unavailable",
+    )
     args = parser.parse_args()
 
     export = pd.read_excel(args.xlsx)
+    fallback_histories = load_committed_snapshot_history()
+    fallback_histories.update(load_snapshot_history(ROOT / "m2-snapshot.json"))
+    if args.external_history_json:
+        fallback_histories.update(load_snapshot_history(args.external_history_json))
     close_date = infer_close_date(args.xlsx, [str(column) for column in export.columns])
     close_iso = close_date.isoformat()
     close_label = date_label(close_date)
@@ -420,6 +480,16 @@ def main() -> int:
         for code in args.prior_current_codes.split(",")
         if re.match(r"^\d{6}$", code.strip())
     }
+    if args.prior_xlsx:
+        prior_export = pd.read_excel(args.prior_xlsx)
+        prior_code_col = BASE_COLS["code"]
+        if prior_code_col not in prior_export.columns:
+            raise ValueError(f"Missing {prior_code_col} in {args.prior_xlsx}")
+        explicit_prior = {
+            str(code)
+            for code in prior_export[prior_code_col]
+            if re.match(r"^\d{6}\.(SZ|SH)$", str(code))
+        }
     if explicit_prior:
         old_current = explicit_prior
     ordered_codes = list(current_by_code)
@@ -439,9 +509,10 @@ def main() -> int:
             else old_by_code.get(code, ["", bare(code)])[1],
         }
         for code in ordered_codes
+        if bare(code) not in fallback_histories and code not in fallback_histories
     ]
     histories: dict[str, dict[str, Any]] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         future_map = {executor.submit(fetch_history, item, close_date): item for item in watch_items}
         for future in concurrent.futures.as_completed(future_map):
             item = future_map[future]
@@ -451,6 +522,7 @@ def main() -> int:
 
     rows: list[dict[str, Any]] = []
     snapshot_history: dict[str, Any] = {}
+    reused_snapshot_codes: list[str] = []
     quote_rows = []
     for code in ordered_codes:
         q = quotes.get(bare(code), {})
@@ -519,7 +591,12 @@ def main() -> int:
             "high": high_price,
             "low": low_price,
         }
-        history = append_current_bar(histories.get(bare(code)), current_quote, close_date)
+        history_source = histories.get(bare(code))
+        if not history_source:
+            history_source = fallback_histories.get(bare(code)) or fallback_histories.get(code)
+            if history_source:
+                reused_snapshot_codes.append(bare(code))
+        history = append_current_bar(history_source, current_quote, close_date)
         if history:
             snapshot_history[bare(code)] = history
             latest = history["rows"][-1]
@@ -537,6 +614,8 @@ def main() -> int:
         pivot = derive_prior_pivot(history, close_date)
         amount_ratio = current_quote["amountYi"] / amount_yi(avg_amount) if current_quote["amountYi"] and avg_amount else None
         price_to_ma50 = (price / ma50 - 1) * 100 if price and ma50 else None
+        from_high = (price / high52 - 1) * 100 if price and high52 else None
+        from_low = (price / low52 - 1) * 100 if price and low52 else None
         row_seed = {
             "code": code,
             "name": name,
@@ -545,6 +624,7 @@ def main() -> int:
             "currentQualified": is_current,
             "amountRatio": amount_ratio,
             "priceToMa50Pct": price_to_ma50,
+            "fromHighPct": from_high,
         }
         rating = classify(row_seed, pivot, metrics, close_label)
         status = "当前合格观察" if is_current else "待复核观察"
@@ -557,8 +637,6 @@ def main() -> int:
             transition = f"{close_label} 收盘重新确认入池"
         else:
             transition = f"{close_label} 收盘未出现，保留记录待复核"
-        from_high = (price / high52 - 1) * 100 if price and high52 else None
-        from_low = (price / low52 - 1) * 100 if price and low52 else None
         rows.append(
             {
                 "code": code,
@@ -699,7 +777,7 @@ def main() -> int:
       recommendation, recommendationClass, recommendationReason, executionRating: {{ stars: executionStars, label: executionLabel, action: executionAction }}, pivot: pivotText, pivotPrice, pivotStatus: pivotLookback ? pivotLookback + '日参考买点' : '待确认', pivotDistance, pivotReason: pivotLookback ? '参考 Pivot 买点取 {close_label} 前最近 ' + pivotLookback + ' 日最高价 ' + pivotText + '（' + pivotDate + '）；收盘突破并明显放量才算触发。' : '观察池记录未包含 Pivot；必须结合动态历史 OHLCV 与图形核验。', pivotLocked: true, contractions: Number.isFinite(Number(contractionCount)) ? contractionCount + ' 次' : '待确认', contractionCount, baseDepthPct, range20Pct, volumeDryUpRatio,
       rsRank: null, rsTrend: '待补 RS', vcpStatus: contractionCount >= 2 ? 'VCP 收缩候选' : (contractionCount >= 1 ? 'VCP 初步收缩' : '待人工复核'), dataQuality: currentQualified ? '{close_label} 收盘导入与收盘报价已更新；Pivot 采用 {close_label} 前高，不把当日高点误作触发点。' : '{close_label} 收盘未重新入选；历史观察保留，待人工复核是否移出。', ma200Slope: '动态日K已补 MA200，斜率仍需人工复核' }};
   }});
-  return {{ asOf: '{close_iso} 收盘行情', selectionAsOf: '{close_iso} 收盘', snapshotAsOf: '{close_iso}', snapshotGeneratedAt: {js(generated_at)}, quoteGeneratedAt: {js(generated_at)}, quoteSourceStatus: 'live', quoteSource: {js(quote_source)}, source: "观察池：{close_label} 收盘合格候选 ∪ 既有观察池待复核；图形：历史日K追加 {close_label} 收盘 OHLCV；报价：东方财富收盘行情", rowCount: rows.length, importedCount: {len(export)}, currentQualifiedCount: {current_count}, priorCloseQualified: {prior_count}, newSinceClose: {new_count}, carryForwardCount: {carry_count}, priorityCount: {len(star4)}, executableCount: {len(star5)}, nearPivotCount: {len(star3)}, waitCount: {len(wait)}, cautionCount: {len(caution)}, reviewCount: {len(review)}, upCount: {sum((row['pct'] or 0) > 0 for row in rows)}, period: '{close_iso} 收盘观察池 / {close_iso} 收盘行情', note: "{close_label} 收盘已按星级重新分层；5 星才是规则化可执行候选，4 星仍是确认中，不生成自动买入指令。", topMovers: {js([row_summary(row) for row in sorted(rows, key=lambda row: row['pct'] or -999, reverse=True)[:8]])}, executableCandidates: {js([row_summary(row) for row in star5[:8]])}, priorityCandidates: {js([row_summary(row) for row in star4[:8]])}, nearPivotCandidates: {js([row_summary(row) for row in star3[:8]])}, cautionCandidates: {js([row_summary(row) for row in caution[:8]])}, reviewStrongCandidates: {js([row_summary(row) for row in sorted(review, key=lambda row: row['pct'] or -999, reverse=True)[:5]])}, rows }};
+  return {{ asOf: '{close_iso} 收盘行情', selectionAsOf: '{close_iso} 收盘', snapshotAsOf: '{close_iso}', closeLabel: '{close_label}', periodLabel: {js(period_text)}, snapshotGeneratedAt: {js(generated_at)}, quoteGeneratedAt: {js(generated_at)}, quoteSourceStatus: 'live', quoteSource: {js(quote_source)}, source: "观察池：{close_label} 收盘合格候选 ∪ 既有观察池待复核；图形：历史日K追加 {close_label} 收盘 OHLCV；报价：东方财富收盘行情", rowCount: rows.length, importedCount: {len(export)}, currentQualifiedCount: {current_count}, priorCloseQualified: {prior_count}, newSinceClose: {new_count}, carryForwardCount: {carry_count}, priorityCount: {len(star4)}, executableCount: {len(star5)}, nearPivotCount: {len(star3)}, waitCount: {len(wait)}, cautionCount: {len(caution)}, reviewCount: {len(review)}, upCount: {sum(row['currentQualified'] and (row['pct'] or 0) > 0 for row in rows)}, period: '{close_iso} 收盘观察池 / {close_iso} 收盘行情', note: "{close_label} 收盘已按星级重新分层；5 星才是规则化可执行候选，4 星仍是确认中，不生成自动买入指令。", topMovers: {js([row_summary(row) for row in sorted(rows, key=lambda row: row['pct'] or -999, reverse=True)[:8]])}, executableCandidates: {js([row_summary(row) for row in star5[:8]])}, priorityCandidates: {js([row_summary(row) for row in star4[:8]])}, nearPivotCandidates: {js([row_summary(row) for row in star3[:8]])}, cautionCandidates: {js([row_summary(row) for row in caution[:8]])}, reviewStrongCandidates: {js([row_summary(row) for row in sorted(review, key=lambda row: row['pct'] or -999, reverse=True)[:5]])}, rows }};
 }})();
 """
     (ROOT / "m2-table-data.js").write_text(table_js, encoding="utf-8")
@@ -734,7 +812,7 @@ def main() -> int:
         {"label": "5星可执行", "value": f"{len(star5)} 只"},
         {"label": "4星确认中", "value": f"{len(star4)} 只"},
         {"label": "3星重点盯", "value": f"{len(star3)} 只"},
-        {"label": "今日上涨", "value": f"{sum((row['pct'] or 0) > 0 for row in rows)} 只"},
+        {"label": "当前池上涨", "value": f"{sum(row['currentQualified'] and (row['pct'] or 0) > 0 for row in rows)} 只"},
     ]
     changes = [
         {"time": "收盘", "text": f"{close_label} 收盘表有效股票 {len(export)} 只；合并旧观察池后持续记录 {len(rows)} 只。"},
@@ -813,11 +891,11 @@ def main() -> int:
         "maxAgeHours": 36,
         "barStatus": "complete",
         "sourceStatus": "live" if len(snapshot_history) == len(ordered_codes) else "partial",
-        "source": f"Local Session · history plus {close_iso} close quote/import append",
+        "source": f"Local Session · history plus {close_iso} close quote/import append; snapshot fallback {len(reused_snapshot_codes)}",
         "quotes": quote_rows,
         "history": snapshot_history,
         "warnings": [] if len(snapshot_history) == len(ordered_codes) else [f"部分历史日K未取到：{len(snapshot_history)}/{len(ordered_codes)}"],
-        "reusedSnapshotCodes": [],
+        "reusedSnapshotCodes": sorted(set(reused_snapshot_codes)),
     }
     (ROOT / "m2-snapshot.json").write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
 

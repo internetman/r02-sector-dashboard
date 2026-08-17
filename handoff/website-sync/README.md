@@ -66,11 +66,13 @@ git push origin main
 handoff/website-sync/sync-to-vercel-repo.sh "你的提交信息"
 ```
 
-日常收盘后可以直接运行：
+日常收盘后把最新的 `*收盘.xlsx` 放入 M2 项目的 `导入/` 根目录，然后直接运行：
 
 ```bash
 bash handoff/website-sync/refresh-m2-site.sh
 ```
+
+脚本会自动选择根目录中修改时间最新的收盘表，使用归档目录里最新的上一份收盘表计算新进/退出，依次生成收盘分析、网站数据、行业映射和历史 K 线快照，提交源码仓库，再同步到 Vercel 生产仓库。可用 `M2_CLOSE_XLSX` 和 `M2_PRIOR_CLOSE_XLSX` 显式覆盖这两个文件。
 
 6. 验证生产：
 
@@ -86,7 +88,7 @@ handoff/website-sync/verify-production.sh
 - M2 静态资源：`m2-styles.css`、`m2-data.js`、`m2-app.js`、`m2-assets/`
 - Vercel Python Serverless Function：`api/dashboard.py`
 - M2 行情 Serverless Function：`api/m2-watchlist.py`
-- M2 动态日K Serverless Function：`api/m2-history.py`
+- M2 快照 Serverless Function：`api/m2-history.py`（默认读 `m2-snapshot.json`，`dynamic=1` 才动态抓取日K）
 - M2 本地快照脚本：`handoff/website-sync/capture-m2-snapshot.py`
 - M2 一键抓取并发布：`handoff/website-sync/refresh-m2-site.sh`
 - 共享抓取逻辑：`server.py`
@@ -112,7 +114,7 @@ M2 建议只提供候选分层，不替用户下单：`突破确认后考虑`、
 - M2 选股快照：建议收盘后 15:30–16:00 由本地 Session 生成并推送
 - M2 快照有效期：36 小时；网页过期后明确标注
 - 网页检查新快照：30 分钟
-- API 动态日K：仅作为本地快照首次生成和网页临时兜底
+- API 动态日K：`/api/m2-history` 默认读已发布快照；`dynamic=1` 仅作为本地排障和快照首次生成兜底
 - R02 雷达页面自动刷新：30 分钟
 - 手动按钮：强制刷新
 - 服务端短缓存：45 秒
