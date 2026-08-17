@@ -101,8 +101,8 @@ h3 { font-size: 16px; font-weight: 500; }
 .section-heading h2 { margin-top: 9px; }
 .heading-note { color: var(--muted); font-size: 11px; }
 .heading-note span { color: var(--green); padding: 0 7px; }
-.home-filter-control { display: flex; align-items: flex-end; gap: 9px; min-width: min(100%, 270px); }
-.home-filter-control label { display: grid; gap: 6px; min-width: 190px; }
+.home-filter-control { display: flex; align-items: flex-end; gap: 9px; min-width: min(100%, 520px); }
+.home-filter-control label { display: grid; gap: 6px; min-width: 178px; }
 .home-filter-control label span { color: var(--muted); font: 9px var(--mono); letter-spacing: .08em; }
 .home-filter-control select { width: 100%; min-height: 34px; color: var(--paper); background: #0b1118; border: 1px solid var(--line-bright); padding: 0 32px 0 11px; border-radius: 0; font: 11px var(--mono); outline: none; cursor: pointer; }
 .home-filter-control select:focus { border-color: rgba(152,229,155,.7); box-shadow: 0 0 0 2px rgba(152,229,155,.08); }
@@ -315,8 +315,9 @@ h3 { font-size: 16px; font-weight: 500; }
   .metric-foot { grid-column: 1 / -1; }
   .watch-grid { grid-template-columns: 1fr; }
   .stock-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home-filter-control { width: 100%; align-items: flex-end; justify-content: space-between; }
+  .home-filter-control { width: 100%; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
   .home-filter-control label { min-width: 0; flex: 1; }
+  .home-filter-control small { flex: 0 0 auto; }
   .chart-modal { padding: 10px; }
   .modal-card { padding: 16px; }
   .modal-image-frame { max-height: 72vh; }

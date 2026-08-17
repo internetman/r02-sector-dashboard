@@ -363,6 +363,8 @@
   $("changeNote").textContent = data.changes.length ? "状态正在变化" : "今日无状态变化";
 
   const homeCategoryFilter = $("homeCategoryFilter");
+  const homeStarFilter = $("homeStarFilter");
+  const itemStars = (item) => Number(item.executionStars || setupRating(item).stars || 0);
   const populateHomeFilter = () => {
     if (!homeCategoryFilter) return;
     const option = (kind, value) => `<option value="${kind}:${escapeXml(value)}">${escapeXml(value)}</option>`;
@@ -384,16 +386,30 @@
       </optgroup>
     `;
   };
+  const populateStarFilter = () => {
+    if (!homeStarFilter) return;
+    const ratingRows = [5, 4, 3, 2, 1]
+      .map((stars) => {
+        const count = data.candidates.filter((item) => itemStars(item) === stars).length;
+        return { stars, count };
+      })
+      .filter((item) => item.count > 0);
+    homeStarFilter.innerHTML = `<option value="all">全部星级</option>${ratingRows
+      .map((item) => `<option value="${item.stars}">${item.stars}星 · ${item.count}只</option>`)
+      .join("")}`;
+  };
   const filteredCandidates = () => {
-    const value = homeCategoryFilter?.value || "all";
-    if (value === "all") return data.candidates;
-    const [kind, target] = value.split(":", 2);
+    const categoryValue = homeCategoryFilter?.value || "all";
+    const starValue = homeStarFilter?.value || "all";
+    const [kind, target] = categoryValue.split(":", 2);
     return data.candidates.filter((item) => {
       const fields = filterValueFor(item);
-      if (kind === "sector") return fields.sectorGroup === target;
-      if (kind === "board") return fields.board === target;
-      if (kind === "industry") return fields.industry === target;
-      return true;
+      const categoryMatch = categoryValue === "all"
+        || (kind === "sector" && fields.sectorGroup === target)
+        || (kind === "board" && fields.board === target)
+        || (kind === "industry" && fields.industry === target);
+      const starMatch = starValue === "all" || itemStars(item) === Number(starValue);
+      return categoryMatch && starMatch;
     });
   };
   const renderCandidates = () => {
@@ -441,12 +457,13 @@
       <div class="stock-action"><span class="action-mark">↳</span><p>${item.action}</p></div>
       <div class="stock-note">${item.note}</div>
     </article>
-    `).join("") : `<div class="empty-filter-state"><strong>当前分类没有候选</strong><small>换一个分类继续看，或回到全部分类。</small></div>`;
+    `).join("") : `<div class="empty-filter-state"><strong>当前筛选没有候选</strong><small>换一个分类或星级继续看，或回到全部。</small></div>`;
     renderDynamicCharts();
   };
 
   populateHomeFilter();
-  homeCategoryFilter?.addEventListener("input", renderCandidates);
+  populateStarFilter();
+  [homeCategoryFilter, homeStarFilter].forEach((control) => control?.addEventListener("input", renderCandidates));
   data.candidates.forEach((item) => {
     item.distance = distanceToPivot(item);
   });
