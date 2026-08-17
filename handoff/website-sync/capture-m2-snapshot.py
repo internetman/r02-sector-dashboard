@@ -3,8 +3,8 @@
 
 Run this after the A-share close (recommended: 15:30 Asia/Shanghai). The script
 does the network calls and VCP pre-screening locally, then writes one atomic JSON
-file. The website reads that file and never needs to wait for six history API
-calls just to paint its cards.
+file. The website reads that file and never needs to wait for one history API
+call per card just to paint its cards.
 """
 
 from __future__ import annotations
@@ -23,6 +23,13 @@ if str(ROOT) not in sys.path:
 from server import M2_WATCHLIST, get_m2_history_payload
 
 
+def load_existing_snapshot(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Capture the M2 daily selection snapshot")
     parser.add_argument(
@@ -37,28 +44,52 @@ def main() -> int:
     history_payload = get_m2_history_payload(force=True, completed_only=True)
     history = history_payload.get("history") or {}
     expected = len(M2_WATCHLIST)
+    reused_from_api = set(history_payload.get("reusedSnapshotCodes") or [])
+    live_history_count = max(0, len(history) - len(reused_from_api))
+
+    output = args.output.resolve()
+    existing = load_existing_snapshot(output)
+    existing_history = existing.get("history") or {}
+    existing_quotes = {str(item.get("code")): item for item in existing.get("quotes") or []}
+    reused_codes = []
+    for item in M2_WATCHLIST:
+        code = item["code"]
+        if code not in history and code in existing_history:
+            history[code] = existing_history[code]
+            reused_codes.append(code)
 
     quotes = []
     for item in M2_WATCHLIST:
         latest = (history.get(item["code"]) or {}).get("rows", [])[-1:]
-        if not latest:
+        if not latest and item["code"] in existing_quotes:
+            quotes.append(existing_quotes[item["code"]])
             continue
-        row = latest[0]
-        quotes.append(
-            {
-                "code": item["code"],
-                "name": item["name"],
-                "price": row.get("close"),
-                "pct": row.get("pct"),
-                "change": row.get("change"),
-                "volumeLots": row.get("volume"),
-                "amountYi": row.get("amountYi"),
-                "amplitude": row.get("amplitude"),
-                "turnover": row.get("turnover"),
-            }
-        )
+        if latest:
+            row = latest[0]
+            quotes.append(
+                {
+                    "code": item["code"],
+                    "name": item["name"],
+                    "price": row.get("close"),
+                    "pct": row.get("pct"),
+                    "change": row.get("change"),
+                    "volumeLots": row.get("volume"),
+                    "amountYi": row.get("amountYi"),
+                    "amplitude": row.get("amplitude"),
+                    "turnover": row.get("turnover"),
+                }
+            )
 
-    if len(quotes) < expected or len(history) < expected:
+    if not live_history_count and existing_history:
+        print(
+            f"Snapshot not written: live history unavailable; kept existing "
+            f"snapshot with history={len(existing_history)}",
+            file=sys.stderr,
+        )
+        for warning in history_payload.get("warnings") or []:
+            print(f"- {warning}", file=sys.stderr)
+        return 1
+    if not history:
         print(
             f"Snapshot not written: quotes={len(quotes)}/{expected}, "
             f"history={len(history)}/{expected}",
@@ -80,14 +111,15 @@ def main() -> int:
         "asOf": max(as_of_values) if as_of_values else None,
         "maxAgeHours": float(os.environ.get("M2_SNAPSHOT_MAX_AGE_HOURS", "36")),
         "barStatus": "partial" if current_bar_is_partial else "complete",
-        "sourceStatus": "live",
+        "sourceStatus": "live" if live_history_count == expected and len(history) == expected else "partial",
         "source": "Local Session · Eastmoney adjusted daily OHLCV + M2 VCP scan",
         "quotes": quotes,
         "history": history,
-        "warnings": history_payload.get("warnings") or [],
+        "warnings": (history_payload.get("warnings") or [])
+        + ([f"沿用已有快照代码：{','.join(reused_codes)}"] if reused_codes else []),
+        "reusedSnapshotCodes": sorted(set(reused_codes) | reused_from_api),
     }
 
-    output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     temp = output.with_suffix(output.suffix + ".tmp")
     temp.write_text(json.dumps(snapshot, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

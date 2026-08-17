@@ -14,6 +14,7 @@ import datetime as dt
 import json
 import math
 import os
+import re
 import statistics
 import time
 import urllib.parse
@@ -30,6 +31,8 @@ STATIC_FILES = {
     "/radar": (ROOT / "radar.html", "text/html; charset=utf-8"),
     "/m2-styles.css": (ROOT / "m2-styles.css", "text/css; charset=utf-8"),
     "/m2-data.js": (ROOT / "m2-data.js", "text/javascript; charset=utf-8"),
+    "/m2-sector-map.js": (ROOT / "m2-sector-map.js", "text/javascript; charset=utf-8"),
+    "/m2-valuation-map.js": (ROOT / "m2-valuation-map.js", "text/javascript; charset=utf-8"),
     "/m2-app.js": (ROOT / "m2-app.js", "text/javascript; charset=utf-8"),
     "/m2-table": (ROOT / "m2-table.html", "text/html; charset=utf-8"),
     "/m2-table.html": (ROOT / "m2-table.html", "text/html; charset=utf-8"),
@@ -46,9 +49,15 @@ SECTOR_RANK_CACHE_MAX_AGE_SECONDS = int(
 FETCH_TIMEOUT_SECONDS = float(os.environ.get("R02_FETCH_TIMEOUT_SECONDS", "4"))
 FETCH_RETRY_ATTEMPTS = max(1, int(os.environ.get("R02_FETCH_RETRY_ATTEMPTS", "2")))
 API_WORKERS = int(os.environ.get("R02_API_WORKERS", "12"))
+M2_HISTORY_WORKERS = max(1, int(os.environ.get("R02_M2_HISTORY_WORKERS", "4")))
+M2_HISTORY_ATTEMPTS = max(1, int(os.environ.get("R02_M2_HISTORY_ATTEMPTS", "2")))
+M2_HISTORY_RETRY_DELAY_SECONDS = float(
+    os.environ.get("R02_M2_HISTORY_RETRY_DELAY_SECONDS", "0.5")
+)
 
 EASTMONEY_REFERER = "https://quote.eastmoney.com/"
 EASTMONEY_UT = "fa5fd1943c7b386f172d6893dbfba10b"
+TENCENT_STOCK_REFERER = "https://gu.qq.com/"
 DAPANYUNTU_REFERER = "https://dapanyuntu.com/"
 SCKD_REFERER = "https://sckd.dapanyuntu.com/"
 
@@ -65,7 +74,7 @@ R02_CURRENT = {
     ),
 }
 
-M2_WATCHLIST = [
+M2_CORE_WATCHLIST = [
     {"code": "300628", "market": "0", "name": "亿联网络"},
     {"code": "601677", "market": "1", "name": "明泰铝业"},
     {"code": "002648", "market": "0", "name": "卫星化学"},
@@ -73,6 +82,51 @@ M2_WATCHLIST = [
     {"code": "300750", "market": "0", "name": "宁德时代"},
     {"code": "000582", "market": "0", "name": "北部湾港"},
 ]
+
+
+def _load_m2_watchlist() -> list[dict[str, str]]:
+    """Load the current import candidates so history coverage follows the table.
+
+    The homepage promotes the rows in m2-table-data.js to M2 cards. Keeping
+    the server-side history list separate from that file meant new cards had no
+    matching OHLCV entry and rendered the empty-chart state. The table is a
+    generated JSON-compatible JavaScript literal, so parse its raw rows here.
+    Fall back to the six core archives if the table is unavailable or malformed.
+    """
+    table_path = ROOT / "m2-table-data.js"
+    try:
+        source = table_path.read_text(encoding="utf-8")
+        match = re.search(r"const raw\s*=\s*(\[\[.*?\]\]);\s*const rows", source, re.S)
+        if not match:
+            raise ValueError("m2-table-data.js raw rows not found")
+        raw_rows = json.loads(match.group(1))
+        candidates: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for row in raw_rows:
+            if not isinstance(row, list) or len(row) < 2:
+                continue
+            raw_code = str(row[0] or "")
+            code = raw_code.split(".", 1)[0]
+            name = str(row[1] or "")
+            if not code or not name or code in seen:
+                continue
+            suffix = raw_code.rsplit(".", 1)[-1].upper()
+            market = "1" if suffix == "SH" else "0"
+            candidates.append({"code": code, "market": market, "name": name})
+            seen.add(code)
+        if candidates:
+            for item in M2_CORE_WATCHLIST:
+                if item["code"] in seen:
+                    continue
+                candidates.append(dict(item))
+                seen.add(item["code"])
+            return candidates
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+    return [dict(item) for item in M2_CORE_WATCHLIST]
+
+
+M2_WATCHLIST = _load_m2_watchlist()
 
 _cache: dict[str, Any] = {"ts": 0.0, "payload": None}
 _m2_quote_cache: dict[str, Any] = {"ts": 0.0, "payload": None}
@@ -283,20 +337,137 @@ def _range_pct(rows: list[dict[str, Any]]) -> float | None:
     return (max(highs) - min(lows)) / max(highs) * 100
 
 
+def _fetch_tencent_m2_history(item: dict[str, Any], end_date: dt.date | None = None) -> list[dict[str, Any]]:
+    market_prefix = "sh" if item["market"] == "1" else "sz"
+    symbol = f"{market_prefix}{item['code']}"
+    end = end_date or dt.date.today()
+    begin = (end - dt.timedelta(days=650)).isoformat()
+    url = (
+        "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+        f"?param={symbol},day,{begin},{end.isoformat()},500,qfq"
+    )
+    payload = fetch_json(url, TENCENT_STOCK_REFERER, timeout=max(FETCH_TIMEOUT_SECONDS, 8))
+    node = (payload.get("data") or {}).get(symbol) or {}
+    raw_rows = node.get("qfqday") or node.get("day") or []
+    rows: list[dict[str, Any]] = []
+    previous_close: float | None = None
+    for raw in raw_rows:
+        if not isinstance(raw, list) or len(raw) < 6:
+            continue
+        close = num(raw[2])
+        change = close - previous_close if close is not None and previous_close else None
+        pct = (change / previous_close * 100) if change is not None and previous_close else None
+        rows.append(
+            {
+                "date": str(raw[0]),
+                "open": num(raw[1]),
+                "close": close,
+                "high": num(raw[3]),
+                "low": num(raw[4]),
+                "volume": num(raw[5]),
+                "amountYi": None,
+                "amplitude": None,
+                "pct": pct,
+                "change": change,
+                "turnover": None,
+            }
+        )
+        if close is not None:
+            previous_close = close
+    return rows
+
+
 def _get_m2_history(item: dict[str, Any], end_date: dt.date | None = None) -> dict[str, Any]:
-    today = end_date or dt.date.today()
-    # 需要至少 200 个交易日的预热数据，避免图表前段出现断裂的 MA200。
-    begin = (today - dt.timedelta(days=650)).strftime("%Y%m%d")
-    end = today.strftime("%Y%m%d")
+    rows: list[dict[str, Any]] = []
+    source = "Tencent ifzq adjusted daily OHLCV"
+    tencent_error: Exception | None = None
+    try:
+        rows = _fetch_tencent_m2_history(item, end_date)
+    except Exception as exc:
+        tencent_error = exc
+
+    if len(rows) >= 210:
+        raw_rows: list[str] = []
+        last_count = len(rows)
+    else:
+        # Eastmoney's historical endpoint can intermittently return an empty array
+        # when a normal rolling begin/end date window is supplied. Fetch the durable
+        # full series and trim locally so a bad date window cannot blank the chart.
+        url = (
+            "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+            f"?secid={item['market']}.{urllib.parse.quote(item['code'])}"
+            "&fields1=f1,f2,f3,f4,f5,f6"
+            "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
+            f"&ut={EASTMONEY_UT}&klt=101&fqt=1&beg=0&end=20500101&lmt=500"
+        )
+        raw_rows = []
+        last_count = 0
+        for attempt in range(M2_HISTORY_ATTEMPTS):
+            payload = fetch_eastmoney_json(url)
+            raw_rows = payload.get("data", {}).get("klines") or []
+            last_count = len(raw_rows)
+            if len(raw_rows) >= 210:
+                break
+            if attempt < M2_HISTORY_ATTEMPTS - 1:
+                time.sleep(M2_HISTORY_RETRY_DELAY_SECONDS * (attempt + 1))
+        rows = []
+        for raw in raw_rows:
+            parts = raw.split(",")
+            if len(parts) < 11:
+                continue
+            rows.append(
+                {
+                    "date": parts[0],
+                    "open": num(parts[1]),
+                    "close": num(parts[2]),
+                    "high": num(parts[3]),
+                    "low": num(parts[4]),
+                    "volume": num(parts[5]),
+                    "amountYi": money_yi(num(parts[6])),
+                    "amplitude": num(parts[7]),
+                    "pct": num(parts[8]),
+                    "change": num(parts[9]),
+                    "turnover": num(parts[10]),
+                }
+            )
+        if end_date:
+            end_date_text = end_date.isoformat()
+            rows = [row for row in rows if str(row.get("date")) <= end_date_text]
+        source = "Eastmoney push2his adjusted daily OHLCV"
+
+    if len(rows) < 210 and tencent_error:
+        raise FetchError(f"{item['code']} Tencent fallback failed: {tencent_error}") from tencent_error
+    if len(rows) < 210:
+        raise FetchError(
+            f"{item['code']} history returned only {len(rows)} rows "
+            f"after Tencent primary and {M2_HISTORY_ATTEMPTS} Eastmoney attempts "
+            f"(last raw={last_count})"
+        )
+
+    # Keep the older Eastmoney parsing block below out of the execution path.
+    if False:
+        pass
+    """
+    # Eastmoney's historical endpoint can intermittently return an empty array
+    # when a normal rolling begin/end date window is supplied. Fetch the durable
+    # full series and trim locally so a bad date window cannot blank the chart.
     url = (
         "https://push2his.eastmoney.com/api/qt/stock/kline/get"
         f"?secid={item['market']}.{urllib.parse.quote(item['code'])}"
         "&fields1=f1,f2,f3,f4,f5,f6"
         "&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
-        f"&ut={EASTMONEY_UT}&klt=101&fqt=1&beg={begin}&end={end}&lmt=500"
+        f"&ut={EASTMONEY_UT}&klt=101&fqt=1&beg=0&end=20500101&lmt=500"
     )
-    payload = fetch_eastmoney_json(url)
-    raw_rows = payload.get("data", {}).get("klines") or []
+    raw_rows: list[str] = []
+    last_count = 0
+    for attempt in range(M2_HISTORY_ATTEMPTS):
+        payload = fetch_eastmoney_json(url)
+        raw_rows = payload.get("data", {}).get("klines") or []
+        last_count = len(raw_rows)
+        if len(raw_rows) >= 210:
+            break
+        if attempt < M2_HISTORY_ATTEMPTS - 1:
+            time.sleep(M2_HISTORY_RETRY_DELAY_SECONDS * (attempt + 1))
     rows: list[dict[str, Any]] = []
     for raw in raw_rows:
         parts = raw.split(",")
@@ -317,8 +488,20 @@ def _get_m2_history(item: dict[str, Any], end_date: dt.date | None = None) -> di
                 "turnover": num(parts[10]),
             }
         )
+    if end_date:
+        end_date_text = end_date.isoformat()
+        rows = [row for row in rows if str(row.get("date")) <= end_date_text]
+    source = "Eastmoney push2his adjusted daily OHLCV"
     if len(rows) < 210:
-        raise FetchError(f"{item['code']} history returned only {len(rows)} rows")
+        rows = _fetch_tencent_m2_history(item, end_date)
+        source = "Tencent ifzq adjusted daily OHLCV"
+    if len(rows) < 210:
+        raise FetchError(
+            f"{item['code']} history returned only {len(rows)} rows "
+            f"after {M2_HISTORY_ATTEMPTS} Eastmoney attempts and Tencent fallback "
+            f"(last raw={last_count})"
+        )
+    """
 
     for index, row in enumerate(rows):
         for window, key in ((50, "ma50"), (150, "ma150"), (200, "ma200")):
@@ -382,6 +565,7 @@ def _get_m2_history(item: dict[str, Any], end_date: dt.date | None = None) -> di
         "asOf": rows[-1]["date"],
         "rows": rows[-160:],
         "metrics": {
+            "source": source,
             "baseDays": 40,
             "baseDepthPct": round(base_depth, 2) if base_depth is not None else None,
             "range20Pct": round(price_range_20, 2) if price_range_20 is not None else None,
@@ -392,6 +576,16 @@ def _get_m2_history(item: dict[str, Any], end_date: dt.date | None = None) -> di
             "vcpStatus": vcp_status,
         },
     }
+
+
+def _load_m2_snapshot_history() -> dict[str, Any]:
+    snapshot_path = ROOT / "m2-snapshot.json"
+    try:
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    history = snapshot.get("history")
+    return history if isinstance(history, dict) else {}
 
 
 def get_m2_history_payload(force: bool = False, completed_only: bool = False) -> dict[str, Any]:
@@ -411,7 +605,8 @@ def get_m2_history_payload(force: bool = False, completed_only: bool = False) ->
             end_date = shanghai_now.date() - dt.timedelta(days=1)
     history: dict[str, Any] = {}
     warnings: list[str] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(API_WORKERS, len(M2_WATCHLIST))) as executor:
+    workers = min(M2_HISTORY_WORKERS, len(M2_WATCHLIST))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         future_map = {executor.submit(_get_m2_history, item, end_date): item for item in M2_WATCHLIST}
         for future in concurrent.futures.as_completed(future_map):
             item = future_map[future]
@@ -420,7 +615,17 @@ def get_m2_history_payload(force: bool = False, completed_only: bool = False) ->
             except Exception as exc:
                 warnings.append(f"{item['name']} 动态日K失败：{exc}")
 
-    source_status = "live" if len(history) == len(M2_WATCHLIST) else ("partial" if history else "unavailable")
+    snapshot_history = _load_m2_snapshot_history()
+    reused_codes = []
+    for item in M2_WATCHLIST:
+        code = item["code"]
+        if code not in history and code in snapshot_history:
+            history[code] = snapshot_history[code]
+            reused_codes.append(code)
+    if reused_codes:
+        warnings.append(f"部分动态日K沿用本地快照：{','.join(reused_codes)}")
+
+    source_status = "live" if len(history) == len(M2_WATCHLIST) and not reused_codes else ("partial" if history else "unavailable")
     payload = {
         "generatedAt": generated_at,
         "cacheTtlSeconds": 600,
@@ -430,6 +635,7 @@ def get_m2_history_payload(force: bool = False, completed_only: bool = False) ->
         "barStatus": "complete" if completed_only else "current",
         "history": history,
         "warnings": warnings,
+        "reusedSnapshotCodes": reused_codes,
     }
     if history:
         cache["ts"] = now
@@ -931,6 +1137,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.send_response(200)
         self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("Pragma", "no-cache")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

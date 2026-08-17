@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0c1118" />
     <title>Mark Minervini 2 · 黑马量化</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c1118'/%3E%3Cpath d='M5 22 12 14l5 4 10-11' fill='none' stroke='%2398e59b' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="m2-styles.css" />
+    <link rel="stylesheet" href="m2-styles.css?v=20260817-close" />
   </head>
   <body>
     <div class="noise"></div>
@@ -62,16 +62,16 @@
             <p id="decisionText">—</p>
             <div class="decision-foot">
               <div><span class="muted-label">下一关注</span><strong id="nextFocus">—</strong></div>
-              <div><span class="muted-label">候选 Pivot</span><strong id="nextPivot">—</strong></div>
+              <div><span class="muted-label">参考 Pivot 买点</span><strong id="nextPivot">—</strong></div>
               <div><span class="muted-label">距 Pivot</span><strong id="nextDistance">—</strong></div>
             </div>
           </article>
           <article class="metric-card">
             <div class="section-kicker">WATCHLIST</div>
             <div class="metric-value" id="watchCount">—</div>
-            <div class="metric-label">持续跟踪股票</div>
+            <div class="metric-label">进入观察阶段股票</div>
             <div class="mini-track"><span id="watchTrack"></span></div>
-            <div class="metric-foot">趋势资格仍是第一道门</div>
+            <div class="metric-foot">首页卡片与本次导入表保持一致</div>
           </article>
           <article class="metric-card alert-metric">
             <div class="section-kicker">STATE CHANGES</div>
@@ -87,7 +87,10 @@
               <div class="section-kicker">THE CANDIDATES</div>
               <h2>股票足迹</h2>
             </div>
-            <div class="heading-note">先看阶段，再看买点 <span>·</span> 量价只是确认</div>
+            <div class="home-filter-control">
+              <label><span>分类筛选</span><select id="homeCategoryFilter"><option value="all">全部分类</option></select></label>
+              <small id="homeFilterCount">—</small>
+            </div>
           </div>
           <div class="watch-grid" id="watchGrid"></div>
         </section>
@@ -111,7 +114,7 @@
           </article>
         </section>
 
-        <footer class="page-footer">M2 / 个股第二阶段优先 · 板块只负责排序 · 没有计划就没有交易 <a class="footer-link" href="/m2-table">打开 8-5 导入表 ↗</a><a class="footer-link" href="/radar">打开 R02 板块雷达 ↗</a></footer>
+        <footer class="page-footer">M2 / 个股第二阶段优先 · 板块只负责排序 · 没有计划就没有交易 <a class="footer-link" href="/m2-table">打开待观察池 ↗</a><a class="footer-link" href="/radar">打开 R02 板块雷达 ↗</a></footer>
       </main>
     </div>
     <div class="chart-modal" id="chartModal" aria-hidden="true">
@@ -127,7 +130,10 @@
         </div>
       </div>
     </div>
-    <script src="m2-data.js"></script>
-    <script src="m2-app.js"></script>
+    <script src="m2-data.js?v=20260817-close"></script>
+    <script src="m2-table-data.js?v=20260817-close"></script>
+    <script src="m2-sector-map.js?v=20260817-close"></script>
+    <script src="m2-valuation-map.js?v=20260817-close"></script>
+    <script src="m2-app.js?v=20260817-close"></script>
   </body>
 </html>

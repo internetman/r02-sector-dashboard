@@ -67,7 +67,7 @@ for url in history_urls:
 
 pages = [
     ("https://www.heimaq.com/", "Mark Minervini 2"),
-    ("https://www.heimaq.com/m2-table", "8-5 早盘导入表"),
+    ("https://www.heimaq.com/m2-table", "M2 待观察股票池"),
     ("https://www.heimaq.com/radar", "R02 盘面板块雷达"),
 ]
 
