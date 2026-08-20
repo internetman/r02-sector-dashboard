@@ -227,7 +227,7 @@ def append_current_bar(
     return {
         **history,
         "asOf": close_iso,
-        "rows": rows[-160:],
+        "rows": rows[-250:],
         "metrics": {
             **(history.get("metrics") or {}),
             **metrics,
@@ -461,7 +461,10 @@ def main() -> int:
 
     export = pd.read_excel(args.xlsx)
     fallback_histories = load_committed_snapshot_history()
-    fallback_histories.update(load_snapshot_history(ROOT / "m2-snapshot.json"))
+    for code, history in load_snapshot_history(ROOT / "m2-snapshot.json").items():
+        existing = fallback_histories.get(code)
+        if not existing or len(history.get("rows", [])) > len(existing.get("rows", [])):
+            fallback_histories[code] = history
     if args.external_history_json:
         fallback_histories.update(load_snapshot_history(args.external_history_json))
     close_date = infer_close_date(args.xlsx, [str(column) for column in export.columns])
@@ -509,7 +512,7 @@ def main() -> int:
             else old_by_code.get(code, ["", bare(code)])[1],
         }
         for code in ordered_codes
-        if bare(code) not in fallback_histories and code not in fallback_histories
+        if len((fallback_histories.get(bare(code)) or fallback_histories.get(code) or {}).get("rows", [])) < 250
     ]
     histories: dict[str, dict[str, Any]] = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
