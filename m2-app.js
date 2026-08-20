@@ -392,8 +392,7 @@
       .map((stars) => {
         const count = data.candidates.filter((item) => itemStars(item) === stars).length;
         return { stars, count };
-      })
-      .filter((item) => item.count > 0);
+      });
     homeStarFilter.innerHTML = `<option value="all">全部星级</option>${ratingRows
       .map((item) => `<option value="${item.stars}">${item.stars}星 · ${item.count}只</option>`)
       .join("")}`;
