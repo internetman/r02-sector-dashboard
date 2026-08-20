@@ -102,19 +102,56 @@
   };
   const applySnapshotPivot = (payload) => {
     const history = payload.history || {};
+    const quoteMap = new Map((payload.quotes || []).map((quote) => [bareCode(quote.code), quote]));
     data.rows.forEach((row) => {
-      if (row.pivotLocked) return;
       const itemHistory = history[bareCode(row.code)] || history[row.code];
-      const pivot = derivePivot(itemHistory);
-      if (!pivot) return;
-      row.pivotPrice = pivot.price;
-      row.pivot = formatPivot(pivot.price);
-      row.pivotStatus = `${pivot.lookback}日参考买点`;
-      row.pivotDistance = pivotDistance(row, pivot.price);
-      row.pivotReason = `参考 Pivot 买点取最近 ${pivot.lookback} 日最高价 ${row.pivot}（${pivot.date}）；收盘突破并明显放量才算触发。`;
+      const quote = quoteMap.get(bareCode(row.code));
+      if (quote) {
+        row.price = finite(quote.price) ?? row.price;
+        row.pct = finite(quote.pct) ?? row.pct;
+        row.quoteChange = finite(quote.change);
+        row.quoteVolumeLots = finite(quote.volumeLots);
+        row.quoteAmountYi = finite(quote.amountYi);
+        row.quoteAmplitude = finite(quote.amplitude);
+        row.quoteTurnover = finite(quote.turnover);
+        row.marketCap = finite(quote.marketCap) ?? row.marketCap;
+        row.floatMarketCap = finite(quote.floatMarketCap) ?? row.floatMarketCap;
+        row.peRatio = finite(quote.peRatio) ?? row.peRatio;
+        row.pbRatio = finite(quote.pbRatio) ?? row.pbRatio;
+      }
+      const latest = itemHistory?.rows?.at(-1);
+      if (latest) {
+        row.ma50 = finite(latest.ma50) ?? row.ma50;
+        row.ma150 = finite(latest.ma150) ?? row.ma150;
+        row.ma200 = finite(latest.ma200) ?? row.ma200;
+        const highs = itemHistory.rows.map((item) => finite(item.high)).filter((value) => value !== null);
+        const lows = itemHistory.rows.map((item) => finite(item.low)).filter((value) => value !== null);
+        if (highs.length) row.high52 = Math.max(...highs.slice(-250));
+        if (lows.length) row.low52 = Math.min(...lows.slice(-250));
+      }
+      if (!row.pivotLocked) {
+        const pivot = derivePivot(itemHistory);
+        if (pivot) {
+          row.pivotPrice = pivot.price;
+          row.pivot = formatPivot(pivot.price);
+          row.pivotStatus = `${pivot.lookback}日参考买点`;
+          row.pivotReason = `参考 Pivot 买点取最近 ${pivot.lookback} 日最高价 ${row.pivot}（${pivot.date}）；收盘突破并明显放量才算触发。`;
+        }
+      }
+      row.pivotDistance = pivotDistance(row, finite(row.pivotPrice));
+      row.priceToMa50Pct = row.price && row.ma50 ? (row.price / row.ma50 - 1) * 100 : null;
+      row.priceToMa150Pct = row.price && row.ma150 ? (row.price / row.ma150 - 1) * 100 : null;
+      row.priceToMa200Pct = row.price && row.ma200 ? (row.price / row.ma200 - 1) * 100 : null;
+      row.ma50ToMa150Pct = row.ma50 && row.ma150 ? (row.ma50 / row.ma150 - 1) * 100 : null;
+      row.ma150ToMa200Pct = row.ma150 && row.ma200 ? (row.ma150 / row.ma200 - 1) * 100 : null;
+      row.fromHighPct = row.price && row.high52 ? (row.price / row.high52 - 1) * 100 : null;
+      row.fromLowPct = row.price && row.low52 ? (row.price / row.low52 - 1) * 100 : null;
+      row.maStacked = row.price > row.ma50 && row.ma50 > row.ma150 && row.ma150 > row.ma200;
+      row.aboveMa50 = row.price > row.ma50;
+      row.aboveMa200 = row.price > row.ma200;
       const countValue = itemHistory?.metrics?.contractionCount;
       if (Number.isFinite(Number(countValue))) row.contractions = `${countValue} 次`;
-      row.dataQuality = `${row.pivotStatus}已补；仍缺 RS 与人工图形确认`;
+      row.dataQuality = `${payload.asOf || data.snapshotAsOf} ${payload.barStatus === "partial" ? "盘中" : "收盘"}行情已更新；执行星级沿用 ${data.selectionAsOf}`;
     });
   };
 
@@ -451,7 +488,18 @@
     try {
       const response = await fetch(`/m2-snapshot.json?ts=${Date.now()}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      applySnapshotPivot(await response.json());
+      const payload = await response.json();
+      applySnapshotPivot(payload);
+      const partial = payload.barStatus === "partial";
+      const marketLabel = payload.asOf ? `${payload.asOf} ${partial ? "盘中行情" : "收盘行情"}` : data.asOf;
+      data.asOf = marketLabel;
+      data.quoteGeneratedAt = payload.quoteGeneratedAt || payload.generatedAt || data.quoteGeneratedAt;
+      data.quoteSource = payload.quoteSource || payload.source || data.quoteSource;
+      data.source = `观察池与执行星级：${data.selectionAsOf}；价格、估值与日K：${marketLabel}；报价：${data.quoteSource}`;
+      data.upCount = data.rows.filter((row) => row.currentQualified && row.pct > 0).length;
+      $("tableAsOf").textContent = `监控报价 ${marketLabel}`;
+      $("tableSource").textContent = data.source;
+      $("summaryUp").textContent = data.upCount;
       renderAnalysis();
       render();
     } catch (error) {

@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#0c1118" />
     <title>M2 待观察股票池 · Mark Minervini 2</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c1118'/%3E%3Cpath d='M5 22 12 14l5 4 10-11' fill='none' stroke='%2398e59b' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="m2-styles.css?v=20260819-close" />
-    <link rel="stylesheet" href="m2-table.css?v=20260819-close" />
+    <link rel="stylesheet" href="m2-styles.css?v=20260820-live" />
+    <link rel="stylesheet" href="m2-table.css?v=20260820-live" />
   </head>
   <body>
     <div class="noise"></div>
@@ -54,7 +54,7 @@
           <article><span>当前合格</span><strong id="summaryStacked">—</strong><small id="summaryQualifiedLabel">收盘仍过硬条件</small></article>
           <article><span>5星可执行</span><strong id="summaryAbove200">—</strong><small>全部条件满足</small></article>
           <article><span>贴近 Pivot</span><strong id="summaryNearHigh">—</strong><small>收盘重点盯</small></article>
-          <article><span>今日上涨</span><strong id="summaryUp">—</strong><small>导出时点涨跌幅</small></article>
+          <article><span>当前上涨</span><strong id="summaryUp">—</strong><small>最新行情涨跌幅</small></article>
         </section>
 
         <section class="deduction-board" aria-label="数据推演">
@@ -91,7 +91,7 @@
           <label class="table-search"><span>查找股票</span><input id="tableSearch" type="search" placeholder="代码或简称" /></label>
           <label><span>观察视图</span><select id="tableFilter"><option value="all">全部待观察</option><option value="star5">5星可执行</option><option value="star4">4星确认中</option><option value="star3">3星重点盯</option><option value="priority">买点候选</option><option value="wait">当前待观察</option><option value="caution">过热不追，保留观察</option><option value="review">待复核观察</option><option value="stacked">MA50 &gt; MA150 &gt; MA200</option><option value="nearHigh">距区间高点 ≤ 10%</option><option value="needsPivot">Pivot / 收缩待确认</option></select></label>
           <label><span>板块分类</span><select id="sectorFilter"><option value="all">全部板块</option></select></label>
-          <label><span>排序</span><select id="tableSort"><option value="stars">星级从高到低</option><option value="pct">今日涨跌幅</option><option value="fromHigh">距离区间高点</option><option value="fromLow">从区间低点反弹</option><option value="amount">平均成交额</option><option value="marketCap">市值</option><option value="pe">PE</option><option value="price">现价</option></select></label>
+          <label><span>排序</span><select id="tableSort"><option value="stars">星级从高到低</option><option value="pct">最新行情涨跌幅</option><option value="fromHigh">距离区间高点</option><option value="fromLow">从区间低点反弹</option><option value="amount">平均成交额</option><option value="marketCap">市值</option><option value="pe">PE</option><option value="price">现价</option></select></label>
           <div class="table-count"><strong id="visibleCount">—</strong><span>行可见</span></div>
           <div class="export-group" aria-label="导出当前列表">
             <span id="exportStatus">导出当前视图</span>
@@ -111,7 +111,7 @@
                   <th>执行星级<br /><small>5 星才可下单</small></th>
                   <th>M2 建议<br /><small>只作筛选参考</small></th>
                   <th>现价</th>
-                  <th>今日涨跌</th>
+                  <th>最新涨跌</th>
                   <th>MA50</th>
                   <th>MA150</th>
                   <th>MA200</th>
@@ -139,9 +139,9 @@
         <footer class="page-footer">M2 / 候选池负责横向筛选 · 卡片页负责候选足迹 · R02 负责板块环境 <a class="footer-link" href="/">返回 M2 首页 ↗</a></footer>
       </main>
     </div>
-    <script src="m2-table-data.js?v=20260819-close"></script>
-    <script src="m2-sector-map.js?v=20260819-close"></script>
-    <script src="m2-valuation-map.js?v=20260819-close"></script>
-    <script src="m2-table-app.js?v=20260819-close"></script>
+    <script src="m2-table-data.js?v=20260820-live"></script>
+    <script src="m2-sector-map.js?v=20260820-live"></script>
+    <script src="m2-valuation-map.js?v=20260820-live"></script>
+    <script src="m2-table-app.js?v=20260820-live"></script>
   </body>
 </html>

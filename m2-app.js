@@ -505,13 +505,29 @@
 
   const applySnapshot = (payload) => {
     const allEntries = Object.entries(payload.history || {});
+    const quoteMap = new Map((payload.quotes || []).map((quote) => [bareCode(quote.code), quote]));
     const candidateCodes = new Set(data.candidates.map((item) => bareCode(item.code)));
     const entries = allEntries.filter(([code]) => candidateCodes.has(bareCode(code)));
     allEntries.forEach(([code, history]) => setHistory(code, history));
     data.candidates.forEach((item) => {
+      const quote = quoteMap.get(bareCode(item.code));
+      if (quote) {
+        item.price = formatPrice(quote.price);
+        item.change = formatPct(quote.pct);
+        item.volume = formatAmountYi(quote.amountYi);
+        item.volumeLabel = `换手 ${formatPlainPct(quote.turnover)} · 振幅 ${formatPlainPct(quote.amplitude)}`;
+        if (finite(quote.marketCap) !== null) item.marketCap = quote.marketCap;
+        if (finite(quote.peRatio) !== null) item.peRatio = quote.peRatio;
+      }
       if (!item.pivotLocked) applyPivotFromHistory(item, getHistory(item.code));
       item.distance = distanceToPivot(item);
     });
+    const currentCodes = new Set(tableRows.filter((row) => row.currentQualified).map((row) => bareCode(row.code)));
+    const currentUp = [...quoteMap.entries()].filter(([code, quote]) => currentCodes.has(code) && finite(quote.pct) > 0).length;
+    const liveStats = data.market.stats.map((stat) => stat.label === "当前池上涨" ? { ...stat, value: `${currentUp} 只` } : stat);
+    $("marketStats").innerHTML = liveStats.map((stat) => `
+      <div class="market-stat"><span>${stat.label}</span><strong>${stat.value}</strong></div>
+    `).join("");
     const focus = data.candidates.find((item) => item.name === data.decision.nextFocus) || data.candidates[0];
     if (focus) {
       $("nextPivot").textContent = focus.pivot || "待确认";
@@ -544,8 +560,13 @@
       const maxAgeHours = Number(payload.maxAgeHours || 36);
       const partial = payload.barStatus === "partial";
       const expired = payload.sourceStatus !== "live" || partial || (ageHours !== null && ageHours > maxAgeHours);
-      $("lastSync").textContent = data.quoteGeneratedAt ? `监控报价 ${data.asOf}` : `选股快照 ${payload.asOf || data.asOf}`;
-      $("quoteSync").textContent = `图形快照 · ${displayTime(payload.generatedAt)}`;
+      const marketLabel = payload.asOf ? `${payload.asOf} ${partial ? "盘中行情" : "收盘行情"}` : data.asOf;
+      $("lastSync").textContent = `监控报价 ${marketLabel}`;
+      $("quoteSync").textContent = `行情与图形 · ${displayTime(payload.quoteGeneratedAt || payload.generatedAt)}`;
+      $("marketStatus").textContent = partial ? "盘中行情已刷新" : data.market.status;
+      $("marketNote").textContent = partial
+        ? `价格与日K已更新至 ${marketLabel}；执行星级仍沿用 ${data.selectionAsOf}，收盘后再重算资格。`
+        : data.market.note;
       $("quoteSync").classList.toggle("stale", expired);
       $("quoteSync").classList.toggle("ready", !expired);
       const statusText = partial ? "选股日K盘中临时" : (expired ? "选股日K已过期" : "选股日K已就绪");

@@ -251,7 +251,7 @@ def get_m2_watchlist_quotes() -> list[dict[str, Any]]:
     secids = ",".join(f"{item['market']}.{item['code']}" for item in M2_WATCHLIST)
     url = (
         "https://push2.eastmoney.com/api/qt/ulist.np/get"
-        "?fltt=2&invt=2&fields=f12,f13,f14,f2,f3,f4,f5,f6,f7,f8&secids="
+        "?fltt=2&invt=2&fields=f12,f13,f14,f2,f3,f4,f5,f6,f7,f8,f9,f15,f16,f17,f18,f20,f21,f167&secids="
         + urllib.parse.quote(secids, safe=".,")
     )
     payload = fetch_eastmoney_json(url)
@@ -273,6 +273,14 @@ def get_m2_watchlist_quotes() -> list[dict[str, Any]]:
                 "amountYi": money_yi(num(row.get("f6"))),
                 "amplitude": num(row.get("f7")),
                 "turnover": num(row.get("f8")),
+                "peRatio": num(row.get("f9")),
+                "high": num(row.get("f15")),
+                "low": num(row.get("f16")),
+                "open": num(row.get("f17")),
+                "preClose": num(row.get("f18")),
+                "marketCap": num(row.get("f20")),
+                "floatMarketCap": num(row.get("f21")),
+                "pbRatio": num(row.get("f167")),
             }
         )
     if not quotes:
@@ -408,6 +416,86 @@ def _fetch_tencent_m2_history(item: dict[str, Any], end_date: dt.date | None = N
     return rows
 
 
+def _build_m2_history_payload(
+    item: dict[str, Any],
+    rows: list[dict[str, Any]],
+    source: str,
+) -> dict[str, Any]:
+    for index, row in enumerate(rows):
+        for window, key in ((50, "ma50"), (150, "ma150"), (200, "ma200")):
+            if index + 1 >= window:
+                closes = [num(point.get("close")) for point in rows[index + 1 - window : index + 1]]
+                closes = [value for value in closes if value is not None]
+                row[key] = sum(closes) / len(closes) if len(closes) == window else None
+            else:
+                row[key] = None
+
+    contraction_windows = []
+    for window in (40, 20, 10):
+        if len(rows) < window * 2:
+            continue
+        previous = rows[-window * 2 : -window]
+        current = rows[-window:]
+        previous_range = _range_pct(previous)
+        current_range = _range_pct(current)
+        previous_volume = _avg_field(previous, "volume")
+        current_volume = _avg_field(current, "volume")
+        if (
+            previous_range is not None
+            and current_range is not None
+            and previous_volume
+            and current_volume
+            and current_range <= previous_range * 0.9
+            and current_volume <= previous_volume * 0.95
+        ):
+            contraction_windows.append(
+                {
+                    "window": window,
+                    "startDate": current[0]["date"],
+                    "endDate": current[-1]["date"],
+                    "rangePct": round(current_range, 2),
+                    "volumeRatio": round(current_volume / previous_volume, 2),
+                }
+            )
+
+    recent_five = rows[-5:]
+    prior_twenty = rows[-25:-5]
+    recent_volume = _avg_field(recent_five, "volume")
+    prior_volume = _avg_field(prior_twenty, "volume")
+    last_ma200 = num(rows[-1].get("ma200"))
+    prior_ma200 = num(rows[-21].get("ma200")) if len(rows) >= 21 else None
+    price_range_20 = _range_pct(rows[-20:])
+    base_highs = [num(row.get("high")) for row in rows[-40:]]
+    base_lows = [num(row.get("low")) for row in rows[-40:]]
+    base_highs = [value for value in base_highs if value is not None]
+    base_lows = [value for value in base_lows if value is not None]
+    base_depth = ((max(base_highs) - min(base_lows)) / max(base_highs) * 100) if base_highs and base_lows and max(base_highs) > 0 else None
+    if len(contraction_windows) >= 2:
+        vcp_status = "VCP 候选：价格与量能连续收缩"
+    elif len(contraction_windows) == 1:
+        vcp_status = "VCP 初步收缩：继续观察"
+    else:
+        vcp_status = "VCP 收缩未确认"
+
+    return {
+        "code": item["code"],
+        "name": item["name"],
+        "asOf": rows[-1]["date"],
+        "rows": rows[-250:],
+        "metrics": {
+            "source": source,
+            "baseDays": 40,
+            "baseDepthPct": round(base_depth, 2) if base_depth is not None else None,
+            "range20Pct": round(price_range_20, 2) if price_range_20 is not None else None,
+            "volumeDryUpRatio": round(recent_volume / prior_volume, 2) if recent_volume and prior_volume else None,
+            "ma200SlopePct20d": round((last_ma200 / prior_ma200 - 1) * 100, 2) if last_ma200 and prior_ma200 else None,
+            "contractionCount": len(contraction_windows),
+            "contractions": contraction_windows,
+            "vcpStatus": vcp_status,
+        },
+    }
+
+
 def _get_m2_history(item: dict[str, Any], end_date: dt.date | None = None) -> dict[str, Any]:
     rows: list[dict[str, Any]] = []
     source = "Tencent ifzq adjusted daily OHLCV"
@@ -534,79 +622,7 @@ def _get_m2_history(item: dict[str, Any], end_date: dt.date | None = None) -> di
         )
     """
 
-    for index, row in enumerate(rows):
-        for window, key in ((50, "ma50"), (150, "ma150"), (200, "ma200")):
-            if index + 1 >= window:
-                closes = [num(point.get("close")) for point in rows[index + 1 - window : index + 1]]
-                closes = [value for value in closes if value is not None]
-                row[key] = sum(closes) / len(closes) if len(closes) == window else None
-            else:
-                row[key] = None
-
-    contraction_windows = []
-    for window in (40, 20, 10):
-        if len(rows) < window * 2:
-            continue
-        previous = rows[-window * 2 : -window]
-        current = rows[-window:]
-        previous_range = _range_pct(previous)
-        current_range = _range_pct(current)
-        previous_volume = _avg_field(previous, "volume")
-        current_volume = _avg_field(current, "volume")
-        if (
-            previous_range is not None
-            and current_range is not None
-            and previous_volume
-            and current_volume
-            and current_range <= previous_range * 0.9
-            and current_volume <= previous_volume * 0.95
-        ):
-            contraction_windows.append(
-                {
-                    "window": window,
-                    "startDate": current[0]["date"],
-                    "endDate": current[-1]["date"],
-                    "rangePct": round(current_range, 2),
-                    "volumeRatio": round(current_volume / previous_volume, 2),
-                }
-            )
-
-    recent_five = rows[-5:]
-    prior_twenty = rows[-25:-5]
-    recent_volume = _avg_field(recent_five, "volume")
-    prior_volume = _avg_field(prior_twenty, "volume")
-    last_ma200 = num(rows[-1].get("ma200"))
-    prior_ma200 = num(rows[-21].get("ma200")) if len(rows) >= 21 else None
-    price_range_20 = _range_pct(rows[-20:])
-    base_highs = [num(row.get("high")) for row in rows[-40:]]
-    base_lows = [num(row.get("low")) for row in rows[-40:]]
-    base_highs = [value for value in base_highs if value is not None]
-    base_lows = [value for value in base_lows if value is not None]
-    base_depth = ((max(base_highs) - min(base_lows)) / max(base_highs) * 100) if base_highs and base_lows and max(base_highs) > 0 else None
-    if len(contraction_windows) >= 2:
-        vcp_status = "VCP 候选：价格与量能连续收缩"
-    elif len(contraction_windows) == 1:
-        vcp_status = "VCP 初步收缩：继续观察"
-    else:
-        vcp_status = "VCP 收缩未确认"
-
-    return {
-        "code": item["code"],
-        "name": item["name"],
-        "asOf": rows[-1]["date"],
-        "rows": rows[-160:],
-        "metrics": {
-            "source": source,
-            "baseDays": 40,
-            "baseDepthPct": round(base_depth, 2) if base_depth is not None else None,
-            "range20Pct": round(price_range_20, 2) if price_range_20 is not None else None,
-            "volumeDryUpRatio": round(recent_volume / prior_volume, 2) if recent_volume and prior_volume else None,
-            "ma200SlopePct20d": round((last_ma200 / prior_ma200 - 1) * 100, 2) if last_ma200 and prior_ma200 else None,
-            "contractionCount": len(contraction_windows),
-            "contractions": contraction_windows,
-            "vcpStatus": vcp_status,
-        },
-    }
+    return _build_m2_history_payload(item, rows, source)
 
 
 def _load_m2_snapshot_history() -> dict[str, Any]:
@@ -677,6 +693,41 @@ def get_m2_history_payload(force: bool = False, completed_only: bool = False) ->
                 history[item["code"]] = future.result()
             except Exception as exc:
                 warnings.append(f"{item['name']} 动态日K失败：{exc}")
+
+    if not completed_only and history:
+        quote_payload = get_m2_watchlist_payload(force=force)
+        quotes_by_code = {
+            str(item.get("code")): item
+            for item in quote_payload.get("quotes") or []
+            if item.get("code")
+        }
+        today = dt.datetime.now().astimezone().date().isoformat()
+        for item in M2_WATCHLIST:
+            code = item["code"]
+            current_history = history.get(code)
+            quote = quotes_by_code.get(code)
+            if not current_history or not quote or num(quote.get("price")) is None:
+                continue
+            rows = [dict(row) for row in current_history.get("rows") or [] if str(row.get("date")) < today]
+            price = num(quote.get("price"))
+            rows.append(
+                {
+                    "date": today,
+                    "open": num(quote.get("open")) or price,
+                    "close": price,
+                    "high": num(quote.get("high")) or price,
+                    "low": num(quote.get("low")) or price,
+                    "volume": num(quote.get("volumeLots")),
+                    "amountYi": num(quote.get("amountYi")),
+                    "amplitude": num(quote.get("amplitude")),
+                    "pct": num(quote.get("pct")),
+                    "change": num(quote.get("change")),
+                    "turnover": num(quote.get("turnover")),
+                }
+            )
+            source = f"{current_history.get('metrics', {}).get('source') or 'adjusted daily OHLCV'} + live quote append"
+            history[code] = _build_m2_history_payload(item, rows, source)
+        warnings.extend(quote_payload.get("warnings") or [])
 
     snapshot_history = _load_m2_snapshot_history()
     reused_codes = []
