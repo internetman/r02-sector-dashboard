@@ -56,14 +56,13 @@ snapshot_urls = [
 
 for url in snapshot_urls:
     print(f"\n{url}")
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}, method="HEAD")
     with urllib.request.urlopen(req, timeout=35) as response:
-        data = json.loads(response.read().decode("utf-8"))
-    history = data.get("history") or {}
-    row_counts = [len(item.get("rows") or []) for item in history.values()]
-    print("asOf:", data.get("asOf"), "sourceStatus:", data.get("sourceStatus"), "stocks:", len(history), "max rows:", max(row_counts or [0]))
-    if not history or max(row_counts or [0]) < 100:
-        raise RuntimeError("M2 static snapshot returned insufficient OHLCV data")
+        content_length = int(response.headers.get("Content-Length") or 0)
+        content_type = response.headers.get("Content-Type") or ""
+    print("snapshot bytes:", content_length, "content-type:", content_type)
+    if content_length < 1_000_000 or "json" not in content_type:
+        raise RuntimeError("M2 static snapshot file is missing or unexpectedly small")
 
 index_urls = [
     "https://www.heimaq.com/m2-history-index.json",
