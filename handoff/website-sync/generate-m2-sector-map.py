@@ -40,6 +40,11 @@ def market_for(code: str) -> str:
 
 def load_watchlist() -> list[tuple[str, str]]:
     source = TABLE_DATA.read_text(encoding="utf-8")
+    assignment = re.search(r"window\.M2_TABLE_DATA\s*=\s*(\{.*\});", source, re.S)
+    if assignment:
+        payload = json.loads(assignment.group(1))
+        rows = payload.get("rows") or []
+        return [(str(row["code"]), str(row["name"])) for row in rows if row.get("code") and row.get("name")]
     match = re.search(r"const raw\s*=\s*(\[\[.*?\]\]);\s*const rows", source, re.S)
     if not match:
         raise RuntimeError(f"Cannot parse raw rows from {TABLE_DATA}")

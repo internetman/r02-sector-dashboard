@@ -67,7 +67,7 @@ for url in snapshot_urls:
 
 pages = [
     ("https://www.heimaq.com/", "Mark Minervini 2"),
-    ("https://www.heimaq.com/m2-table", "M2 待观察股票池"),
+    ("https://www.heimaq.com/m2-table", "M2 双阶段股票池"),
     ("https://www.heimaq.com/radar", "R02 盘面板块雷达"),
 ]
 

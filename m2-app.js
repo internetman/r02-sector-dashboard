@@ -43,6 +43,7 @@
   const historyKey = (value) => bareCode(value);
   const marketBoard = (value) => {
     const code = bareCode(value);
+    if (/^(4|8|92)/.test(code)) return { label: "北交所", className: "bse" };
     if (/^68[89]/.test(code)) return { label: "科创板", className: "sci" };
     if (/^30[01]/.test(code)) return { label: "创业板", className: "growth" };
     return { label: "普通A股", className: "main" };
@@ -80,6 +81,7 @@
       sectorGroup: info.sectorGroup || "其它主题",
       industry: info.industry || "行业待补",
       board: board.label || "普通A股",
+      market: item.exchange || (board.label === "北交所" ? "北交所" : (/^6/.test(bareCode(item.code)) ? "上交所" : "深交所")),
     };
   };
   const setHistory = (code, history) => historyCache.set(historyKey(code), history);
@@ -165,6 +167,11 @@
         price: formatPrice(row.price),
         change: formatPct(row.pct),
         stage: row.stageInference || previous.stage,
+        exchange: row.exchange,
+        ma200SlopePct20d: row.ma200SlopePct20d,
+        ma50SlopePct20d: row.ma50SlopePct20d,
+        high20Higher: row.high20Higher,
+        low20Higher: row.low20Higher,
         state: row.status || previous.state,
         stateClass: row.recommendationClass === "review" ? "review" : "watch",
         sector: row.currentQualified ? sectorLabel(row.code) : `${sectorLabel(row.code)} / 待复核`,
@@ -173,9 +180,7 @@
         pivotLocked: Boolean(row.pivotLocked || previous.pivotLocked),
         pivotStatus: row.pivotStatus || previous.pivotStatus || "待确认",
         pivotReason: row.pivotReason || previous.pivotReason,
-        stageReason: row.currentQualified
-          ? "当前仍通过 M2-01 观察资格；第二阶段、RS、VCP 和 Pivot 仍需历史 OHLCV / 图形复核。"
-          : "历史已进入观察池；当前导出未确认继续合格，保留记录等待收盘或图形复核。",
+        stageReason: row.stageReason || previous.stageReason,
         volume: formatAmountYi(row.quoteAmountYi),
         volumeLabel: `换手 ${formatPlainPct(row.quoteTurnover)} · 振幅 ${formatPlainPct(row.quoteAmplitude)}`,
         volumeRule: "突破日需明显放量",
@@ -186,9 +191,8 @@
         executionLabel: setupRating(row).label,
         executionAction: setupRating(row).action,
         buyRank: row.buyRank || 0,
-        action: row.currentQualified
-          ? "继续观察；补 RS、历史 OHLCV、Pivot、收缩次数和突破量。未确认前不买。"
-          : "保留记录待复核；若收盘后仍不满足趋势 / 位置 / 量价，再人工决定是否移出。",
+        range: Math.min(100, setupRating(row).stars * 18),
+        action: row.executionAction || previous.action,
         note: `${row.transition || "观察池记录"}；${selectionLabel} ${formatPct(row.pct)}，距 52 周高点 ${formatPct(row.fromHighPct)}，距 MA50 ${formatPct(row.priceToMa50Pct)}。`,
         baseAge: "待历史 OHLCV",
         contractions: row.contractions || "待确认",
@@ -210,20 +214,25 @@
       sector: sectorLabel(row.code),
       state: row.status || "观察",
       stateClass: row.recommendationClass === "review" ? "review" : "watch",
-      stage: row.stageInference || "阶段 2 初筛",
+      stage: row.stageInference || "待复核",
+      exchange: row.exchange,
+      ma200SlopePct20d: row.ma200SlopePct20d,
+      ma50SlopePct20d: row.ma50SlopePct20d,
+      high20Higher: row.high20Higher,
+      low20Higher: row.low20Higher,
       price: formatPrice(row.price),
       change: formatPct(row.pct),
       volume: formatAmountYi(row.quoteAmountYi),
       volumeLabel: `换手 ${formatPlainPct(row.quoteTurnover)} · 振幅 ${formatPlainPct(row.quoteAmplitude)}`,
-      pivot: "待确认",
-      distance: "—",
-      range: 18,
+      pivot: row.pivot || "待确认",
+      distance: row.pivotDistance || "—",
+      range: Math.min(100, setupRating(row).stars * 18),
       rangeLabel: "证据完整度",
       pivotPrice: row.pivotPrice || null,
       pivotLocked: Boolean(row.pivotLocked),
       pivotStatus: row.pivotStatus || "待确认",
       pivotReason: row.pivotReason || "本次导入未包含 Pivot；需补充动态历史 OHLCV 后确认当前平台上沿。",
-      stageReason: "均线与位置初筛通过；RS、平台持续时间、收缩顺序和突破量尚未补齐。",
+      stageReason: row.stageReason || "阶段证据不足，等待历史日K复核。",
       volumeRule: "突破日需明显放量",
       advice: row.recommendation || (caution ? "不追当日大涨" : avoid ? "等待回到强势区" : "待观察"),
       adviceClass: row.recommendationClass || "wait",
@@ -232,14 +241,12 @@
       executionLabel: setupRating(row).label,
       executionAction: setupRating(row).action,
       buyRank: row.buyRank || 0,
-      action: row.currentQualified
-        ? "补充历史 OHLCV、RS、Pivot、收缩次数和突破量；未确认前不买。"
-        : "保留记录待复核；若收盘后仍不满足趋势 / 位置 / 量价，再人工决定是否移出。",
+      action: row.executionAction || "记录观察，不是买点。",
       note: row.transition || "本卡片代表进入 M2 观察阶段，不代表已经形成买点。",
       baseAge: "待历史 OHLCV",
-      contractions: "未确认",
-      contractionDetail: "等待动态历史扫描；i问财导出未包含收缩次数。",
-      correction: "待历史 OHLCV",
+      contractions: row.contractions || "未确认",
+      contractionDetail: row.vcpStatus ? `${row.vcpStatus}；需人工确认` : "等待动态历史扫描。",
+      correction: finite(row.baseDepthPct) === null ? "待历史 OHLCV" : `${finite(row.baseDepthPct).toFixed(1)}%（算法）`,
       chart: null,
       priority: index + 1,
     };
@@ -364,6 +371,10 @@
 
   const homeCategoryFilter = $("homeCategoryFilter");
   const homeStarFilter = $("homeStarFilter");
+  const homeStageFilter = $("homeStageFilter");
+  const homeMarketFilter = $("homeMarketFilter");
+  const poolButtons = [...document.querySelectorAll("[data-stage-pool]")];
+  let activePool = "transition";
   const itemStars = (item) => Number(item.executionStars || setupRating(item).stars || 0);
   const populateHomeFilter = () => {
     if (!homeCategoryFilter) return;
@@ -379,12 +390,27 @@
         ${sectorGroups.map((value) => option("sector", value)).join("")}
       </optgroup>
       <optgroup label="交易板块">
-        ${["科创板", "创业板", "普通A股"].map((value) => option("board", value)).join("")}
+        ${["北交所", "科创板", "创业板", "普通A股"].map((value) => option("board", value)).join("")}
       </optgroup>
       <optgroup label="所属行业">
         ${industries.map((value) => option("industry", value)).join("")}
       </optgroup>
     `;
+  };
+  const populateStageFilter = () => {
+    if (!homeStageFilter) return;
+    const stages = ["S1→S2过渡", "S2趋势", "S2延伸", "S2转弱", "待复核"];
+    homeStageFilter.innerHTML = `<option value="all">全部阶段 · ${data.candidates.length}只</option>${stages.map((stage) => {
+      const count = data.candidates.filter((item) => item.stage === stage).length;
+      return `<option value="${stage}">${stage} · ${count}只</option>`;
+    }).join("")}`;
+    if ($("transitionPoolCount")) $("transitionPoolCount").textContent = `${data.candidates.filter((item) => item.stage === "S1→S2过渡").length}只`;
+    if ($("s2PoolCount")) $("s2PoolCount").textContent = `${data.candidates.filter((item) => ["S2趋势", "S2延伸", "S2转弱"].includes(item.stage)).length}只`;
+  };
+  const populateMarketFilter = () => {
+    if (!homeMarketFilter) return;
+    const markets = ["上交所", "深交所", "北交所"];
+    homeMarketFilter.innerHTML = `<option value="all">全部市场</option>${markets.map((market) => `<option value="${market}">${market} · ${data.candidates.filter((item) => filterValueFor(item).market === market).length}只</option>`).join("")}`;
   };
   const populateStarFilter = () => {
     if (!homeStarFilter) return;
@@ -400,6 +426,8 @@
   const filteredCandidates = () => {
     const categoryValue = homeCategoryFilter?.value || "all";
     const starValue = homeStarFilter?.value || "all";
+    const stageValue = homeStageFilter?.value || "all";
+    const marketValue = homeMarketFilter?.value || "all";
     const [kind, target] = categoryValue.split(":", 2);
     return data.candidates.filter((item) => {
       const fields = filterValueFor(item);
@@ -408,7 +436,12 @@
         || (kind === "board" && fields.board === target)
         || (kind === "industry" && fields.industry === target);
       const starMatch = starValue === "all" || itemStars(item) === Number(starValue);
-      return categoryMatch && starMatch;
+      const stageMatch = stageValue === "all" || item.stage === stageValue;
+      const marketMatch = marketValue === "all" || fields.market === marketValue;
+      const poolMatch = activePool === "all"
+        || (activePool === "transition" && item.stage === "S1→S2过渡")
+        || (activePool === "s2" && ["S2趋势", "S2延伸", "S2转弱"].includes(item.stage));
+      return categoryMatch && starMatch && stageMatch && marketMatch && poolMatch;
     });
   };
   const renderCandidates = () => {
@@ -425,7 +458,7 @@
           <span class="state-chip ${item.stateClass}">${item.state}</span>
         </div>
       </div>
-      <div class="stock-price-row"><strong>${item.price}</strong><span class="change ${String(item.change).indexOf("−") === 0 || String(item.change).indexOf("-") === 0 ? "down" : "up"}">${item.change}</span><span class="stage-tag">${item.stage}</span></div>
+      <div class="stock-price-row"><strong>${item.price}</strong><span class="change ${String(item.change).indexOf("−") === 0 || String(item.change).indexOf("-") === 0 ? "down" : "up"}">${item.change}</span><span class="stage-tag ${item.stage === "S1→S2过渡" ? "stage-transition" : item.stage === "S2趋势" ? "stage-s2" : item.stage === "S2延伸" ? "stage-extended" : item.stage === "S2转弱" ? "stage-weak" : "stage-review"}">${item.stage}</span></div>
       <div class="pivot-focus ${item.pivotPrice ? "ready" : "pending"}">
         <span>参考 PIVOT 买点 / 平台上沿</span>
         <strong>${item.pivot}</strong>
@@ -440,7 +473,7 @@
       </div>
       <div class="pivot-evidence">
         <div><span>为什么是这个突破点</span><strong>${item.pivotReason}</strong></div>
-        <div><span>阶段证据</span><strong>${item.stageReason}</strong></div>
+        <div><span>阶段证据</span><strong>${item.stageReason}</strong><small>MA200斜率 ${formatPct(item.ma200SlopePct20d)} · MA50斜率 ${formatPct(item.ma50SlopePct20d)} · 高/低点抬高 ${item.high20Higher ? "是" : "否"}/${item.low20Higher ? "是" : "否"}</small></div>
       </div>
       <div class="recommendation-band ${item.adviceClass || "wait"}"><span>M2 建议</span><strong>${item.advice || "等待进一步确认"}</strong><small>${item.adviceReason || "需结合 Pivot、收缩和突破量复核。"}</small><em>${starText(item.executionStars || 2)} ${item.executionLabel || "2星 观察"} · ${item.executionAction || "记录观察，不是买点。"}</em></div>
       <div class="footprint-grid">
@@ -462,7 +495,20 @@
 
   populateHomeFilter();
   populateStarFilter();
-  [homeCategoryFilter, homeStarFilter].forEach((control) => control?.addEventListener("input", renderCandidates));
+  populateStageFilter();
+  populateMarketFilter();
+  [homeCategoryFilter, homeStarFilter, homeMarketFilter].forEach((control) => control?.addEventListener("input", renderCandidates));
+  homeStageFilter?.addEventListener("input", () => {
+    activePool = "all";
+    poolButtons.forEach((button) => { button.classList.remove("active"); button.setAttribute("aria-selected", "false"); });
+    renderCandidates();
+  });
+  poolButtons.forEach((button) => button.addEventListener("click", () => {
+    activePool = button.dataset.stagePool || "all";
+    if (homeStageFilter) homeStageFilter.value = "all";
+    poolButtons.forEach((item) => { const active = item === button; item.classList.toggle("active", active); item.setAttribute("aria-selected", String(active)); });
+    renderCandidates();
+  }));
   data.candidates.forEach((item) => {
     item.distance = distanceToPivot(item);
   });
@@ -558,7 +604,8 @@
       const ageHours = Number.isFinite(generated) ? Math.max(0, (Date.now() - generated) / 3600000) : null;
       const maxAgeHours = Number(payload.maxAgeHours || 36);
       const partial = payload.barStatus === "partial";
-      const expired = payload.sourceStatus !== "live" || partial || (ageHours !== null && ageHours > maxAgeHours);
+      const coveragePartial = payload.sourceStatus !== "live";
+      const expired = partial || (ageHours !== null && ageHours > maxAgeHours);
       const marketLabel = payload.asOf ? `${payload.asOf} ${partial ? "盘中行情" : "收盘行情"}` : data.asOf;
       $("lastSync").textContent = `监控报价 ${marketLabel}`;
       $("quoteSync").textContent = `行情与图形 · ${displayTime(payload.quoteGeneratedAt || payload.generatedAt)}`;
@@ -568,7 +615,7 @@
         : data.market.note;
       $("quoteSync").classList.toggle("stale", expired);
       $("quoteSync").classList.toggle("ready", !expired);
-      const statusText = partial ? "选股日K盘中临时" : (expired ? "选股日K已过期" : "选股日K已就绪");
+      const statusText = partial ? "选股日K盘中临时" : (expired ? "选股日K已过期" : (coveragePartial ? "选股日K已就绪，少量待复核" : "选股日K已就绪"));
       historySync.textContent = `${statusText} ${payload.asOf || ""} · ${entries.length}/${data.candidates.length}`;
       historySync.classList.toggle("stale", expired);
       historySync.classList.toggle("ready", !expired);

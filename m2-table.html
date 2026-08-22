@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0c1118" />
-    <title>M2 待观察股票池 · Mark Minervini 2</title>
+    <title>M2 双阶段股票池 · Mark Minervini 2</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c1118'/%3E%3Cpath d='M5 22 12 14l5 4 10-11' fill='none' stroke='%2398e59b' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="m2-styles.css?v=20260820-close" />
-    <link rel="stylesheet" href="m2-table.css?v=20260820-close" />
+    <link rel="stylesheet" href="m2-styles.css?v=20260821-stages" />
+    <link rel="stylesheet" href="m2-table.css?v=20260821-stages" />
   </head>
   <body>
     <div class="noise"></div>
@@ -31,7 +31,7 @@
         <header class="topbar">
           <div>
             <div class="eyebrow">MARK MINERVINI 2 <span>/</span> IMPORT SNAPSHOT</div>
-            <h1>M2 待观察股票池</h1>
+            <h1>M2 双阶段股票池</h1>
           </div>
           <div class="topbar-meta">
             <div class="last-sync"><span class="live-dot"></span><span id="tableAsOf">读取中</span></div>
@@ -43,18 +43,18 @@
         <section class="table-intro">
           <div>
             <div class="section-kicker">WHY THIS TABLE EXISTS</div>
-            <h2>记录需要继续观察的股票</h2>
-            <p>每天导出的股票会变化，所以这里记录“曾按 M2-01 进入观察池且尚未确认失效”的股票。当前合格、新进观察和待复核观察都会保留，方便后续补图、补 RS、补 Pivot。</p>
+            <h2>分开看过渡与趋势</h2>
+            <p>网站先按统一规则唯一判定 S1→S2、S2趋势、S2延伸、S2转弱和待复核，再独立计算 Pivot、量能与执行星级。阶段符合不等于可以买入。</p>
           </div>
           <div class="table-source">SOURCE<br /><strong id="tableSource">—</strong></div>
         </section>
 
         <section class="table-summary" aria-label="导入表摘要">
           <article><span>观察池</span><strong id="summaryTotal">—</strong><small>持续记录</small></article>
-          <article><span>当前合格</span><strong id="summaryStacked">—</strong><small id="summaryQualifiedLabel">收盘仍过硬条件</small></article>
-          <article><span>5星可执行</span><strong id="summaryAbove200">—</strong><small>全部条件满足</small></article>
-          <article><span>贴近 Pivot</span><strong id="summaryNearHigh">—</strong><small>收盘重点盯</small></article>
-          <article><span>当前上涨</span><strong id="summaryUp">—</strong><small>最新行情涨跌幅</small></article>
+          <article><span>S1→S2过渡</span><strong id="summaryStacked">—</strong><small id="summaryQualifiedLabel">正式过渡池</small></article>
+          <article><span>S2趋势</span><strong id="summaryAbove200">—</strong><small>位置正常</small></article>
+          <article><span>S2延伸</span><strong id="summaryNearHigh">—</strong><small>趋势仍在，不追高</small></article>
+          <article><span>5星可执行</span><strong id="summaryUp">—</strong><small>仍需人工复核</small></article>
         </section>
 
         <section class="deduction-board" aria-label="数据推演">
@@ -62,7 +62,7 @@
             <div>
               <div class="section-kicker">DATA DEDUCTION</div>
               <h2>从每日导出到执行星级</h2>
-              <p>先记录该观察的股票，再按证据完整度给星级。5 星才代表可执行；4 星只是进入触发区，仍要等收盘、量能、止损和仓位确认。</p>
+              <p>先判阶段，再判形态、Pivot、量能和执行风险。过渡池最高 2 星；4 星和 5 星只允许出现在位置正常的 S2 趋势中。</p>
             </div>
             <div class="deduction-stamp"><span>推演基准</span><strong id="deductionAsOf">收盘</strong><small>观察池并集 · 自动更新</small></div>
           </div>
@@ -89,8 +89,10 @@
 
         <section class="table-controls" aria-label="表格筛选">
           <label class="table-search"><span>查找股票</span><input id="tableSearch" type="search" placeholder="代码或简称" /></label>
-          <label><span>观察视图</span><select id="tableFilter"><option value="all">全部待观察</option><option value="star5">5星可执行</option><option value="star4">4星确认中</option><option value="star3">3星重点盯</option><option value="priority">买点候选</option><option value="wait">当前待观察</option><option value="caution">过热不追，保留观察</option><option value="review">待复核观察</option><option value="stacked">MA50 &gt; MA150 &gt; MA200</option><option value="nearHigh">距区间高点 ≤ 10%</option><option value="needsPivot">Pivot / 收缩待确认</option></select></label>
+          <label><span>阶段筛选</span><select id="tableStageFilter"><option value="all">全部阶段</option><option value="S1→S2过渡">S1→S2过渡</option><option value="S2趋势">S2趋势</option><option value="S2延伸">S2延伸</option><option value="S2转弱">S2转弱</option><option value="待复核">待复核</option></select></label>
+          <label><span>执行视图</span><select id="tableFilter"><option value="all">全部星级</option><option value="star5">5星可执行</option><option value="star4">4星确认中</option><option value="star3">3星重点盯</option><option value="priority">买点候选</option><option value="wait">当前待观察</option><option value="caution">过热不追</option><option value="review">待复核</option><option value="stacked">MA50 &gt; MA150 &gt; MA200</option><option value="nearHigh">距区间高点 ≤ 10%</option></select></label>
           <label><span>板块分类</span><select id="sectorFilter"><option value="all">全部板块</option></select></label>
+          <label><span>市场筛选</span><select id="tableMarketFilter"><option value="all">全部市场</option><option value="上交所">上交所</option><option value="深交所">深交所</option><option value="北交所">北交所</option></select></label>
           <label><span>排序</span><select id="tableSort"><option value="stars">星级从高到低</option><option value="pct">最新行情涨跌幅</option><option value="fromHigh">距离区间高点</option><option value="fromLow">从区间低点反弹</option><option value="amount">平均成交额</option><option value="marketCap">市值</option><option value="pe">PE</option><option value="price">现价</option></select></label>
           <div class="table-count"><strong id="visibleCount">—</strong><span>行可见</span></div>
           <div class="export-group" aria-label="导出当前列表">
@@ -124,7 +126,7 @@
                   <th>均额<br /><small>元</small></th>
                   <th>市值<br /><small>亿元</small></th>
                   <th>PE<br /><small>动态</small></th>
-                  <th>200 日线趋势</th>
+                  <th>均线斜率<br /><small>MA200 / MA50 · 20日</small></th>
                   <th>数据完整性</th>
                   <th>Pivot</th>
                   <th>收缩</th>
@@ -139,9 +141,9 @@
         <footer class="page-footer">M2 / 候选池负责横向筛选 · 卡片页负责候选足迹 · R02 负责板块环境 <a class="footer-link" href="/">返回 M2 首页 ↗</a></footer>
       </main>
     </div>
-    <script src="m2-table-data.js?v=20260820-close"></script>
-    <script src="m2-sector-map.js?v=20260820-close"></script>
-    <script src="m2-valuation-map.js?v=20260820-close"></script>
-    <script src="m2-table-app.js?v=20260820-close"></script>
+    <script src="m2-table-data.js?v=20260821-close"></script>
+    <script src="m2-sector-map.js?v=20260821-close"></script>
+    <script src="m2-valuation-map.js?v=20260821-close"></script>
+    <script src="m2-table-app.js?v=20260821-stages"></script>
   </body>
 </html>

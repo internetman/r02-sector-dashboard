@@ -66,13 +66,16 @@ git push origin main
 handoff/website-sync/sync-to-vercel-repo.sh "你的提交信息"
 ```
 
-日常收盘后把最新的 `*收盘.xlsx` 放入 M2 项目的 `导入/` 根目录，然后直接运行：
+日常收盘后把最新的 S1→S2 与 S2 两张爱问财导出表放入 M2 项目的 `导入/` 根目录，然后运行：
 
 ```bash
-bash handoff/website-sync/refresh-m2-site.sh
+python3 handoff/website-sync/generate-m2-close.py \
+  "/Users/leon/Documents/400=学习/402=投资/Mark Minervini 2/导入/8-21 收盘 S1-S2 筛选.xlsx" \
+  "/Users/leon/Documents/400=学习/402=投资/Mark Minervini 2/导入/8-21 收盘 S2 阶段 .xlsx"
+python3 handoff/website-sync/generate-m2-sector-map.py
 ```
 
-脚本会自动选择根目录中修改时间最新的收盘表，使用归档目录里最新的上一份收盘表计算新进/退出，依次生成收盘分析、网站数据、行业映射和历史 K 线快照，提交源码仓库，再同步到 Vercel 生产仓库。可用 `M2_CLOSE_XLSX` 和 `M2_PRIOR_CLOSE_XLSX` 显式覆盖这两个文件。
+第一张参数必须是 S1→S2 宽筛结果，第二张参数必须是 S2 趋势模板结果。脚本会合并两表并按股票代码去重，补齐历史日 K，按统一规则唯一归类阶段，再生成收盘分析、网站数据和历史快照。生成完成后按前述源码仓库和 Vercel 仓库步骤提交发布。
 
 6. 验证生产：
 
@@ -83,7 +86,7 @@ handoff/website-sync/verify-production.sh
 ## 当前部署口径
 
 - 静态首页：`index.html`（Mark Minervini 2）
-- M2 导入表格页：`m2-table.html`（当前 8-5 早盘 i问财快照，含关键数据表、均线距离推演和摘要图形）
+- M2 导入表格页：`m2-table.html`（双阶段持续观察表，含阶段、星级、市场和行业筛选）
 - R02 雷达页：`/radar`（源码文件：`radar.html`）
 - M2 静态资源：`m2-styles.css`、`m2-data.js`、`m2-app.js`、`m2-assets/`
 - Vercel Python Serverless Function：`api/dashboard.py`

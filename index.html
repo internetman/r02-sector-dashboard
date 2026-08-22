@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0c1118" />
     <title>Mark Minervini 2 · 黑马量化</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230c1118'/%3E%3Cpath d='M5 22 12 14l5 4 10-11' fill='none' stroke='%2398e59b' stroke-width='3'/%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="m2-styles.css?v=20260820-close" />
+    <link rel="stylesheet" href="m2-styles.css?v=20260821-stages" />
   </head>
   <body>
     <div class="noise"></div>
@@ -88,10 +88,16 @@
               <h2>股票足迹</h2>
             </div>
             <div class="home-filter-control">
+              <label><span>阶段筛选</span><select id="homeStageFilter"><option value="all">全部阶段</option></select></label>
               <label><span>分类筛选</span><select id="homeCategoryFilter"><option value="all">全部分类</option></select></label>
               <label><span>星级筛选</span><select id="homeStarFilter"><option value="all">全部星级</option></select></label>
+              <label><span>市场筛选</span><select id="homeMarketFilter"><option value="all">全部市场</option></select></label>
               <small id="homeFilterCount">—</small>
             </div>
+          </div>
+          <div class="stage-pool-tabs" role="tablist" aria-label="阶段主视图">
+            <button class="active" type="button" data-stage-pool="transition" role="tab" aria-selected="true">S1→S2 过渡 <span id="transitionPoolCount">—</span></button>
+            <button type="button" data-stage-pool="s2" role="tab" aria-selected="false">S2 趋势 <span id="s2PoolCount">—</span></button>
           </div>
           <div class="watch-grid" id="watchGrid"></div>
         </section>
@@ -131,10 +137,10 @@
         </div>
       </div>
     </div>
-    <script src="m2-data.js?v=20260820-close"></script>
-    <script src="m2-table-data.js?v=20260820-close"></script>
-    <script src="m2-sector-map.js?v=20260820-close"></script>
-    <script src="m2-valuation-map.js?v=20260820-close"></script>
-    <script src="m2-app.js?v=20260820-close-stars"></script>
+    <script src="m2-data.js?v=20260821-close"></script>
+    <script src="m2-table-data.js?v=20260821-close"></script>
+    <script src="m2-sector-map.js?v=20260821-close"></script>
+    <script src="m2-valuation-map.js?v=20260821-close"></script>
+    <script src="m2-app.js?v=20260821-stages"></script>
   </body>
 </html>

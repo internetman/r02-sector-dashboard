@@ -16,7 +16,7 @@ if [ ! -d "$SOURCE_DIR/.git" ]; then
   exit 1
 fi
 
-python3 -m py_compile "$SOURCE_DIR/server.py" "$SOURCE_DIR/api/dashboard.py" "$SOURCE_DIR/api/m2-watchlist.py" "$SOURCE_DIR/api/m2-history.py" "$SOURCE_DIR/handoff/website-sync/capture-m2-snapshot.py" "$SOURCE_DIR/handoff/website-sync/generate-m2-sector-map.py"
+python3 -m py_compile "$SOURCE_DIR/server.py" "$SOURCE_DIR/api/dashboard.py" "$SOURCE_DIR/api/m2-watchlist.py" "$SOURCE_DIR/api/m2-history.py" "$SOURCE_DIR/handoff/website-sync/capture-m2-snapshot.py" "$SOURCE_DIR/handoff/website-sync/generate-m2-close.py" "$SOURCE_DIR/handoff/website-sync/generate-m2-sector-map.py"
 node - "$SOURCE_DIR/index.html" <<'NODE'
 const fs = require('fs');
 const htmlPath = process.argv[2];

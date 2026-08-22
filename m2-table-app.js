@@ -22,6 +22,7 @@
   const bareCode = (value) => String(value || "").split(".")[0];
   const marketBoard = (value) => {
     const code = bareCode(value);
+    if (/^(4|8|92)/.test(code)) return { label: "北交所", className: "bse" };
     if (/^68[89]/.test(code)) return { label: "科创板", className: "sci" };
     if (/^30[01]/.test(code)) return { label: "创业板", className: "growth" };
     return { label: "普通A股", className: "main" };
@@ -157,15 +158,15 @@
 
   $("tableAsOf").textContent = data.quoteGeneratedAt ? `监控报价 ${data.asOf}` : `导入快照 ${data.asOf}`;
   $("tableSource").textContent = data.source;
-  $("summaryQualifiedLabel").textContent = `${data.selectionAsOf}仍过硬条件`;
+  $("summaryQualifiedLabel").textContent = `${data.selectionAsOf}正式过渡池`;
   $("deductionAsOf").textContent = data.selectionAsOf;
   $("flowCurrentLabel").textContent = `02 / ${data.closeLabel || "收盘"}`;
   $("periodLabel").textContent = data.periodLabel || "近 20 日";
   $("summaryTotal").textContent = data.rowCount;
-  $("summaryStacked").textContent = data.currentQualifiedCount || data.rows.filter((row) => row.currentQualified).length;
-  $("summaryAbove200").textContent = data.rows.filter((row) => setupRating(row).stars >= 5).length;
-  $("summaryNearHigh").textContent = data.nearPivotCount || 0;
-  $("summaryUp").textContent = data.upCount ?? data.rows.filter((row) => row.currentQualified && row.pct > 0).length;
+  $("summaryStacked").textContent = data.stageCounts?.["S1→S2过渡"] || 0;
+  $("summaryAbove200").textContent = data.stageCounts?.["S2趋势"] || 0;
+  $("summaryNearHigh").textContent = data.stageCounts?.["S2延伸"] || 0;
+  $("summaryUp").textContent = data.starCounts?.["5"] || 0;
 
   const populateSectorFilter = () => {
     const select = $("sectorFilter");
@@ -224,6 +225,8 @@
   const getRows = () => {
     const query = $("tableSearch").value.trim().toLowerCase();
     const filter = $("tableFilter").value;
+    const stageFilter = $("tableStageFilter")?.value || "all";
+    const marketFilter = $("tableMarketFilter")?.value || "all";
     const sectorFilter = $("sectorFilter")?.value || "all";
     const sort = $("tableSort").value;
     const rows = data.rows.filter((row) => {
@@ -231,6 +234,8 @@
       const info = sectorInfo(row);
       const matchesSearch = !query || `${row.code} ${row.name} ${board} ${sectorSearchText(row)}`.toLowerCase().includes(query);
       const matchesSector = sectorFilter === "all" || info.sectorGroup === sectorFilter;
+      const matchesStage = stageFilter === "all" || row.stage === stageFilter;
+      const matchesMarket = marketFilter === "all" || row.exchange === marketFilter;
       const matchesFilter = filter === "all"
         || (filter === "stacked" && row.maStacked)
         || (filter === "nearHigh" && row.fromHighPct >= -10)
@@ -240,9 +245,8 @@
         || (filter === "star3" && setupRating(row).stars === 3)
         || (filter === "priority" && ["execute", "priority"].includes(row.recommendationClass))
         || (filter === "wait" && row.recommendationClass === "wait")
-        || (filter === "review" && row.recommendationClass === "review")
-        || filter === "needsPivot";
-      return matchesSearch && matchesSector && matchesFilter;
+        || (filter === "review" && row.recommendationClass === "review");
+      return matchesSearch && matchesSector && matchesStage && matchesMarket && matchesFilter;
     });
     const valueOf = (row) => ({
       stars: starSortValue(row),
@@ -279,6 +283,8 @@
     observationDate: row.dataAsOf,
     currentQualified: Boolean(row.currentQualified),
     status: row.status,
+    stage: row.stage,
+    stageReason: row.stageReason,
     setupStars: setupRating(row).stars,
     setupRating: setupRating(row).label,
     setupAction: setupRating(row).action,
@@ -290,6 +296,8 @@
     ma50: finite(row.ma50),
     ma150: finite(row.ma150),
     ma200: finite(row.ma200),
+    ma200SlopePct20d: finite(row.ma200SlopePct20d),
+    ma50SlopePct20d: finite(row.ma50SlopePct20d),
     maStacked: Boolean(row.maStacked),
     aboveMa50: Boolean(row.aboveMa50),
     priceToMa50Pct: finite(row.priceToMa50Pct),
@@ -327,6 +335,7 @@
     ["概念标签", (row) => (row.concepts || []).join(" / ")],
     ["星级", (row) => `${starText(row.setupStars)} ${row.setupRating}`],
     ["状态", (row) => row.status],
+    ["阶段", (row) => row.stage],
     ["建议", (row) => row.recommendation],
     ["现价", (row) => price(row.price)],
     ["涨跌", (row) => pct(row.pct)],
@@ -339,6 +348,8 @@
     ["MA50", (row) => price(row.ma50)],
     ["MA150", (row) => price(row.ma150)],
     ["MA200", (row) => price(row.ma200)],
+    ["MA200斜率20日", (row) => pct(row.ma200SlopePct20d)],
+    ["MA50斜率20日", (row) => pct(row.ma50SlopePct20d)],
     ["均线结构", (row) => row.maStacked && row.aboveMa50 ? "多头通过" : "待复核"],
     ["距MA50", (row) => pct(row.priceToMa50Pct)],
     ["距MA200", (row) => pct(row.priceToMa200Pct)],
@@ -466,14 +477,14 @@
         <td>${price(row.ma200)}</td>
         <td class="${row.maStacked && row.aboveMa50 ? "ma-pass" : "ma-warn"}">${row.maStacked && row.aboveMa50 ? "多头通过" : "待复核"}</td>
         <td class="derived-cell"><strong>高于 MA200 ${pct(row.priceToMa200Pct)}</strong><small>MA50→150 ${pct(row.ma50ToMa150Pct)} · MA150→200 ${pct(row.ma150ToMa200Pct)}</small></td>
-        <td class="stage-cell ${row.stageInference === "阶段 2 初筛通过" ? "stage-pass" : "stage-pending"}"><strong>${row.stageInference}</strong><small>${row.periodPct > 0 ? "阶段涨幅为正" : "阶段涨幅待复核"}</small></td>
+        <td class="stage-cell ${row.stage === "S1→S2过渡" ? "stage-transition" : row.stage === "S2趋势" ? "stage-pass" : row.stage === "S2延伸" ? "stage-extended" : row.stage === "S2转弱" ? "stage-weak" : "stage-review"}"><strong>${row.stage}</strong><small>${row.stageReason}</small></td>
         <td class="${row.periodPct >= 0 ? "pct-up" : "pct-down"}">${pct(row.periodPct)}</td>
         <td class="${row.fromHighPct >= -10 ? "near-high" : ""}">${pct(row.fromHighPct)}</td>
         <td>${pct(row.fromLowPct)}</td>
         <td>${count(row.avgAmount)}</td>
         <td class="valuation-cell"><strong>${amountYi(row.marketCap ?? valuationInfo(row).marketCap)}</strong><small>总市值</small></td>
         <td class="valuation-cell"><strong>${pe(row.peRatio ?? valuationInfo(row).peRatio)}</strong><small>动态 PE</small></td>
-        <td class="trend-pending">${row.ma200Slope || "待复核"}</td>
+        <td class="trend-pending"><strong>${pct(row.ma200SlopePct20d)}</strong><small>MA50 ${pct(row.ma50SlopePct20d)}</small></td>
         <td class="data-warning" title="${row.dataQuality || ""}">${row.dataQuality || "—"}</td>
         <td class="${row.pivotPrice ? "pivot-ready" : "pivot-pending"}" title="${row.pivotReason || ""}"><strong>${row.pivot}</strong><small>${row.pivotStatus || "待确认"} · ${row.pivotDistance || "—"}</small></td>
         <td class="contraction-pending">${row.contractions}</td>
@@ -481,7 +492,7 @@
     `).join("");
   };
 
-  ["tableSearch", "tableFilter", "sectorFilter", "tableSort"].forEach((id) => $(id)?.addEventListener("input", render));
+  ["tableSearch", "tableStageFilter", "tableMarketFilter", "tableFilter", "sectorFilter", "tableSort"].forEach((id) => $(id)?.addEventListener("input", render));
   render();
 
   const syncSnapshot = async () => {
@@ -499,7 +510,7 @@
       data.upCount = data.rows.filter((row) => row.currentQualified && row.pct > 0).length;
       $("tableAsOf").textContent = `监控报价 ${marketLabel}`;
       $("tableSource").textContent = data.source;
-      $("summaryUp").textContent = data.upCount;
+      $("summaryUp").textContent = data.starCounts?.["5"] || 0;
       renderAnalysis();
       render();
     } catch (error) {
