@@ -92,6 +92,7 @@ handoff/website-sync/verify-production.sh
 - Vercel Python Serverless Function：`api/dashboard.py`
 - M2 行情 Serverless Function：`api/m2-watchlist.py`（默认读已发布收盘报价，`dynamic=1` 才实时抓取）
 - M2 快照 Serverless Function：`api/m2-history.py`（默认读 `m2-snapshot.json`，`dynamic=1` 才动态抓取日K）
+- M2 首页图表索引：`m2-history-index.json`；单股日K位于 `m2-history/<股票代码>.json`，按进入视口的卡片懒加载。
 - M2 本地快照脚本：`handoff/website-sync/capture-m2-snapshot.py`
 - M2 一键抓取并发布：`handoff/website-sync/refresh-m2-site.sh`
 - 共享抓取逻辑：`server.py`
@@ -100,7 +101,7 @@ handoff/website-sync/verify-production.sh
 
 M2 建议只提供候选分层，不替用户下单：`突破确认后考虑`、`不追当日大涨`、`等待平台/突破`、`暂不建议买入`。导入表的建议基于带时间的快照；Pivot、收缩次数、底部时间和突破量仍需历史 OHLCV 与图形复核。
 
-首页候选卡正常读取 `m2-snapshot.json`，不再依赖截图或打开网页时临时抓取六只股票；点击“动态 VCP 图”会查看由复权日K、成交量、MA50/150/200、候选 Pivot 和算法收缩区绘制的图形。`m2-assets/` 中的旧图片仅保留为历史存档。
+完整 `m2-snapshot.json` 保留给 API 和数据核验；首页不再一次下载整包历史数据，而是先读取轻量索引，再按可见卡片加载单股日K。点击“动态 VCP 图”会查看由复权日K、成交量、MA50/150/200、候选 Pivot 和算法收缩区绘制的图形。`m2-assets/` 中的旧图片仅保留为历史存档。
 
 行情源：
 

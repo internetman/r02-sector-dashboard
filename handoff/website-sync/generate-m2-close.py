@@ -200,6 +200,38 @@ def js(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
+def write_snapshot_bundle(snapshot: dict[str, Any]) -> None:
+    """Write the full API snapshot plus small files for lazy chart loading."""
+    history = snapshot.get("history") if isinstance(snapshot.get("history"), dict) else {}
+    history_dir = ROOT / "m2-history"
+    history_dir.mkdir(exist_ok=True)
+    expected_files = {f"{bare(code)}.json" for code in history}
+    for old_file in history_dir.glob("*.json"):
+        if old_file.name not in expected_files:
+            old_file.unlink()
+    for code, payload in history.items():
+        (history_dir / f"{bare(code)}.json").write_text(js(payload), encoding="utf-8")
+
+    quote_codes = {bare(item.get("code") or item.get("symbol")) for item in snapshot.get("quotes") or []}
+    available_codes = sorted({bare(code) for code in history})
+    index = {
+        "schemaVersion": 1,
+        "generatedAt": snapshot.get("generatedAt"),
+        "asOf": snapshot.get("asOf"),
+        "maxAgeHours": snapshot.get("maxAgeHours"),
+        "barStatus": snapshot.get("barStatus"),
+        "sourceStatus": snapshot.get("sourceStatus"),
+        "source": snapshot.get("source"),
+        "totalCount": len(quote_codes),
+        "availableCount": len(available_codes),
+        "availableCodes": available_codes,
+        "missingCodes": sorted(quote_codes - set(available_codes)),
+        "warnings": snapshot.get("warnings") or [],
+    }
+    (ROOT / "m2-history-index.json").write_text(js(index), encoding="utf-8")
+    (ROOT / "m2-snapshot.json").write_text(js(snapshot), encoding="utf-8")
+
+
 def load_old_rows(path: Path) -> list[list[Any]]:
     source = path.read_text(encoding="utf-8")
     match = re.search(r"const raw\s*=\s*(\[\[.*?\]\]);\s*const rows", source, re.S)
@@ -1137,7 +1169,7 @@ def main() -> int:
         "warnings": [] if len(snapshot_history) == len(ordered_codes) else [f"部分历史日K未取到：{len(snapshot_history)}/{len(ordered_codes)}"],
         "reusedSnapshotCodes": sorted(set(reused_snapshot_codes)),
     }
-    (ROOT / "m2-snapshot.json").write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_snapshot_bundle(snapshot)
 
     args.analysis_dir.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -1559,7 +1591,7 @@ def main_stage() -> int:
         "warnings": [] if not history_missing else [f"历史日K不足：{len(history_missing)}只（{'、'.join(history_missing[:10])}）"],
         "reusedSnapshotCodes": sorted(set(reused_snapshot_codes)),
     }
-    (ROOT / "m2-snapshot.json").write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_snapshot_bundle(snapshot)
     (ROOT / "m2-stage-state.json").write_text(json.dumps({"asOf": close_iso, "generatedAt": generated_at, "rows": rows}, ensure_ascii=False, indent=2), encoding="utf-8")
 
     args.analysis_dir.mkdir(parents=True, exist_ok=True)

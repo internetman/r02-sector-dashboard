@@ -40,6 +40,7 @@ STATIC_FILES = {
     "/m2-table-data.js": (ROOT / "m2-table-data.js", "text/javascript; charset=utf-8"),
     "/m2-table-app.js": (ROOT / "m2-table-app.js", "text/javascript; charset=utf-8"),
     "/m2-snapshot.json": (ROOT / "m2-snapshot.json", "application/json; charset=utf-8"),
+    "/m2-history-index.json": (ROOT / "m2-history-index.json", "application/json; charset=utf-8"),
 }
 CACHE_TTL_SECONDS = 45
 TREND_CACHE_TTL_SECONDS = int(os.environ.get("R02_TREND_CACHE_TTL_SECONDS", "1800"))
@@ -1222,6 +1223,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             content_type = "image/jpeg" if asset_name.lower().endswith((".jpg", ".jpeg")) else "image/png"
             self.serve_file(ROOT / "m2-assets" / asset_name, content_type)
+            return
+        if parsed.path.startswith("/m2-history/"):
+            history_name = urllib.parse.unquote(parsed.path.removeprefix("/m2-history/"))
+            if not re.fullmatch(r"\d{6}\.json", history_name):
+                self.send_error(404, "Not found")
+                return
+            self.serve_file(ROOT / "m2-history" / history_name, "application/json; charset=utf-8")
             return
         if parsed.path == "/api/dashboard":
             params = urllib.parse.parse_qs(parsed.query)

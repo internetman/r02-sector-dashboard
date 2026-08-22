@@ -36,6 +36,10 @@
       : `已越过 ${Math.abs(distance).toFixed(2)}%`;
   };
   const historyCache = new Map();
+  const historyRequests = new Map();
+  const historyLoadState = new Map();
+  let historyAvailableCodes = null;
+  let chartObserver = null;
   const escapeXml = (value) => String(value ?? "").replace(/[<>&'"]/g, (char) => ({"<":"&lt;",">":"&gt;","&":"&amp;","'":"&apos;","\"":"&quot;"}[char]));
   const finite = (value) => (value === null || value === undefined || value === "") ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
   const chartPct = (value) => finite(value) === null ? "—" : `${finite(value) >= 0 ? "+" : "−"}${Math.abs(finite(value)).toFixed(1)}%`;
@@ -265,7 +269,11 @@
     if (!container) return;
     const rows = history?.rows || [];
     if (rows.length < 20) {
-      container.innerHTML = `<div class="chart-loading">动态日K暂不可用<br /><small>本次仅完成趋势初筛，等待历史 OHLCV；不使用旧截图替代</small></div>`;
+      const state = historyLoadState.get(historyKey(item.code));
+      const unavailable = state === "missing" || state === "failed";
+      container.innerHTML = unavailable
+        ? `<div class="chart-loading">动态日K暂不可用<br /><small>${state === "missing" ? "该股票历史 OHLCV 数据不足" : "单股历史文件读取失败，请刷新后重试"}；不使用旧截图替代</small></div>`
+        : `<div class="chart-loading">动态日K加载中…<br /><small>正在按需读取 ${escapeXml(item.name)} 的历史 OHLCV</small></div>`;
       return;
     }
     const width = large ? 1180 : 720;
@@ -350,6 +358,68 @@
       ${pivotLine}${labels}
       <text x="${left}" y="${(volumeTop - 16).toFixed(1)}" class="chart-legend"><tspan fill="#98e59b">MA50</tspan><tspan fill="#86b8e7"> · MA150</tspan><tspan fill="#e8c76d"> · MA200</tspan><tspan fill="#e87575"> · 上涨</tspan><tspan fill="#5ac7a0"> · 下跌</tspan></text>
     </svg><div class="dynamic-chart-caption">${escapeXml(caption)}</div>`;
+  };
+
+  const updateHistoryMetrics = (item) => {
+    const metrics = getHistory(item.code)?.metrics;
+    if (!metrics) return;
+    const values = {
+      baseAge: `${metrics.baseDays ?? "—"} 个交易日（算法）`,
+      contractions: `${metrics.contractionCount ?? "—"} 次（算法）`,
+      correction: finite(metrics.baseDepthPct) === null ? "待确认" : `${finite(metrics.baseDepthPct).toFixed(1)}%（算法）`,
+      contractionDetail: `${metrics.vcpStatus || "VCP 动态扫描"}；需人工确认`,
+    };
+    document.querySelectorAll(`[data-history-code="${item.code}"]`).forEach((element) => {
+      const value = values[element.dataset.historyMetric];
+      if (value) element.textContent = value;
+    });
+  };
+
+  const paintHistory = (item) => {
+    document.querySelectorAll(`.dynamic-chart-thumb[data-code="${item.code}"] .dynamic-chart-content`).forEach((container) => {
+      renderVcpChart(container, getHistory(item.code), item);
+    });
+    updateHistoryMetrics(item);
+    if (modal?.classList.contains("open") && modal.dataset.code === historyKey(item.code)) {
+      renderVcpChart(modalChart, getHistory(item.code), item, true);
+    }
+  };
+
+  const loadHistory = async (item) => {
+    const code = historyKey(item.code);
+    if (getHistory(code)) return getHistory(code);
+    if (historyRequests.has(code)) return historyRequests.get(code);
+    if (historyAvailableCodes && !historyAvailableCodes.has(code)) {
+      historyLoadState.set(code, "missing");
+      paintHistory(item);
+      return null;
+    }
+    historyLoadState.set(code, "loading");
+    paintHistory(item);
+    const version = encodeURIComponent(String(data.snapshotAsOf || data.selectionAsOf || "current"));
+    const request = fetch(`/m2-history/${code}.json?v=${version}`, { cache: "force-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((history) => {
+        if (!Array.isArray(history?.rows) || history.rows.length < 20) throw new Error("OHLCV rows missing");
+        setHistory(code, history);
+        historyLoadState.set(code, "ready");
+        if (!item.pivotLocked) applyPivotFromHistory(item, history);
+        item.distance = distanceToPivot(item);
+        paintHistory(item);
+        return history;
+      })
+      .catch((error) => {
+        historyLoadState.set(code, historyAvailableCodes?.has(code) ? "failed" : "missing");
+        console.warn(`M2 history load failed: ${code}`, error);
+        paintHistory(item);
+        return null;
+      })
+      .finally(() => historyRequests.delete(code));
+    historyRequests.set(code, request);
+    return request;
   };
 
   $("lastSync").textContent = data.quoteGeneratedAt ? `监控报价 ${data.asOf}` : `结构快照 ${data.asOf}`;
@@ -477,11 +547,11 @@
       </div>
       <div class="recommendation-band ${item.adviceClass || "wait"}"><span>M2 建议</span><strong>${item.advice || "等待进一步确认"}</strong><small>${item.adviceReason || "需结合 Pivot、收缩和突破量复核。"}</small><em>${starText(item.executionStars || 2)} ${item.executionLabel || "2星 观察"} · ${item.executionAction || "记录观察，不是买点。"}</em></div>
       <div class="footprint-grid">
-        <div><span>底部时间</span><strong>${chartMetric(item, "baseAge", item.baseAge)}</strong></div>
-        <div><span>收缩次数</span><strong>${chartMetric(item, "contractions", item.contractions)}</strong></div>
-        <div><span>修正深度</span><strong>${chartMetric(item, "correction", item.correction)}</strong></div>
+        <div><span>底部时间</span><strong data-history-code="${item.code}" data-history-metric="baseAge">${chartMetric(item, "baseAge", item.baseAge)}</strong></div>
+        <div><span>收缩次数</span><strong data-history-code="${item.code}" data-history-metric="contractions">${chartMetric(item, "contractions", item.contractions)}</strong></div>
+        <div><span>修正深度</span><strong data-history-code="${item.code}" data-history-metric="correction">${chartMetric(item, "correction", item.correction)}</strong></div>
       </div>
-      <div class="structure-note"><span>VCP 动态扫描</span><strong>${chartMetric(item, "contractionDetail", item.contractionDetail)}</strong><small>量能条件：${item.volumeRule}</small></div>
+      <div class="structure-note"><span>VCP 动态扫描</span><strong data-history-code="${item.code}" data-history-metric="contractionDetail">${chartMetric(item, "contractionDetail", item.contractionDetail)}</strong><small>量能条件：${item.volumeRule}</small></div>
       <button class="chart-thumb dynamic-chart-thumb" type="button" data-code="${item.code}" data-name="${item.name} ${item.code}">
         <div class="dynamic-chart-content"><div class="chart-loading">等待选股快照…</div></div>
         <span>动态 VCP 图 <b>↗</b></span>
@@ -525,15 +595,17 @@
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
   };
-  $("watchGrid").addEventListener("click", (event) => {
+  $("watchGrid").addEventListener("click", async (event) => {
     const button = event.target.closest(".dynamic-chart-thumb");
     if (!button) return;
     const item = data.candidates.find((candidate) => historyKey(candidate.code) === historyKey(button.dataset.code));
     if (!item) return;
     modalTitle.textContent = button.dataset.name;
+    modal.dataset.code = historyKey(item.code);
     renderVcpChart(modalChart, getHistory(item.code), item, true);
     modal.classList.add("open");
     modal.setAttribute("aria-hidden", "false");
+    await loadHistory(item);
   });
   modal.querySelector(".modal-backdrop").addEventListener("click", closeModal);
   modal.querySelector(".modal-close").addEventListener("click", closeModal);
@@ -542,44 +614,23 @@
   });
 
   renderDynamicCharts = () => {
-    data.candidates.forEach((item) => {
-      const container = document.querySelector(`.dynamic-chart-thumb[data-code="${item.code}"] .dynamic-chart-content`);
-      if (container) renderVcpChart(container, getHistory(item.code), item);
-    });
-  };
-
-  const applySnapshot = (payload) => {
-    const allEntries = Object.entries(payload.history || {});
-    const quoteMap = new Map((payload.quotes || []).map((quote) => [bareCode(quote.code), quote]));
-    const candidateCodes = new Set(data.candidates.map((item) => bareCode(item.code)));
-    const entries = allEntries.filter(([code]) => candidateCodes.has(bareCode(code)));
-    allEntries.forEach(([code, history]) => setHistory(code, history));
-    data.candidates.forEach((item) => {
-      const quote = quoteMap.get(bareCode(item.code));
-      if (quote) {
-        item.price = formatPrice(quote.price);
-        item.change = formatPct(quote.pct);
-        item.volume = formatAmountYi(quote.amountYi);
-        item.volumeLabel = `换手 ${formatPlainPct(quote.turnover)} · 振幅 ${formatPlainPct(quote.amplitude)}`;
-        if (finite(quote.marketCap) !== null) item.marketCap = quote.marketCap;
-        if (finite(quote.peRatio) !== null) item.peRatio = quote.peRatio;
+    chartObserver?.disconnect();
+    chartObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        chartObserver.unobserve(entry.target);
+        const item = data.candidates.find((candidate) => historyKey(candidate.code) === historyKey(entry.target.dataset.code));
+        if (item) loadHistory(item);
+      });
+    }, { rootMargin: "700px 0px" });
+    document.querySelectorAll(".dynamic-chart-thumb").forEach((button) => {
+      const item = data.candidates.find((candidate) => historyKey(candidate.code) === historyKey(button.dataset.code));
+      if (!item) return;
+      paintHistory(item);
+      if (!getHistory(item.code) && !["missing", "failed"].includes(historyLoadState.get(historyKey(item.code)))) {
+        chartObserver.observe(button);
       }
-      if (!item.pivotLocked) applyPivotFromHistory(item, getHistory(item.code));
-      item.distance = distanceToPivot(item);
     });
-    const currentCodes = new Set(tableRows.filter((row) => row.currentQualified).map((row) => bareCode(row.code)));
-    const currentUp = [...quoteMap.entries()].filter(([code, quote]) => currentCodes.has(code) && finite(quote.pct) > 0).length;
-    const liveStats = data.market.stats.map((stat) => stat.label === "当前池上涨" ? { ...stat, value: `${currentUp} 只` } : stat);
-    $("marketStats").innerHTML = liveStats.map((stat) => `
-      <div class="market-stat"><span>${stat.label}</span><strong>${stat.value}</strong></div>
-    `).join("");
-    const focus = data.candidates.find((item) => item.name === data.decision.nextFocus) || data.candidates[0];
-    if (focus) {
-      $("nextPivot").textContent = focus.pivot || "待确认";
-      $("nextDistance").textContent = focus.distance || "—";
-    }
-    renderCandidates();
-    return entries;
   };
 
   const displayTime = (value) => {
@@ -592,14 +643,12 @@
   const syncSnapshot = async () => {
     const historySync = $("historySync");
     try {
-      // The normal path is a static snapshot produced by the local Session.
-      // This makes the page a display layer and avoids one cold-start request
-      // per candidate every time the page is opened.
-      const response = await fetch(`/m2-snapshot.json?ts=${Date.now()}`, { cache: "no-store" });
+      const version = encodeURIComponent(String(data.snapshotAsOf || data.selectionAsOf || "current"));
+      const response = await fetch(`/m2-history-index.json?v=${version}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
-      const entries = applySnapshot(payload);
-      if (!entries.length) throw new Error("选股快照没有历史日K");
+      historyAvailableCodes = new Set(payload.availableCodes || []);
+      if (!historyAvailableCodes.size) throw new Error("选股快照没有历史日K");
       const generated = payload.generatedAt ? Date.parse(payload.generatedAt) : NaN;
       const ageHours = Number.isFinite(generated) ? Math.max(0, (Date.now() - generated) / 3600000) : null;
       const maxAgeHours = Number(payload.maxAgeHours || 36);
@@ -616,9 +665,10 @@
       $("quoteSync").classList.toggle("stale", expired);
       $("quoteSync").classList.toggle("ready", !expired);
       const statusText = partial ? "选股日K盘中临时" : (expired ? "选股日K已过期" : (coveragePartial ? "选股日K已就绪，少量待复核" : "选股日K已就绪"));
-      historySync.textContent = `${statusText} ${payload.asOf || ""} · ${entries.length}/${data.candidates.length}`;
+      historySync.textContent = `${statusText} ${payload.asOf || ""} · ${payload.availableCount || historyAvailableCodes.size}/${payload.totalCount || data.candidates.length}`;
       historySync.classList.toggle("stale", expired);
       historySync.classList.toggle("ready", !expired);
+      renderDynamicCharts();
     } catch (error) {
       historySync.textContent = "选股快照读取失败，等待本地刷新";
       historySync.classList.add("stale");

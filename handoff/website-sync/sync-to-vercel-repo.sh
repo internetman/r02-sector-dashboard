@@ -56,6 +56,9 @@ cp "$SOURCE_DIR/m2-sector-map.js" "$WORKDIR/m2-sector-map.js"
 cp "$SOURCE_DIR/m2-valuation-map.js" "$WORKDIR/m2-valuation-map.js"
 cp "$SOURCE_DIR/m2-table-app.js" "$WORKDIR/m2-table-app.js"
 cp "$SOURCE_DIR/m2-snapshot.json" "$WORKDIR/m2-snapshot.json"
+cp "$SOURCE_DIR/m2-history-index.json" "$WORKDIR/m2-history-index.json"
+mkdir -p "$WORKDIR/m2-history"
+cp "$SOURCE_DIR/m2-history/"*.json "$WORKDIR/m2-history/"
 mkdir -p "$WORKDIR/m2-assets"
 cp "$SOURCE_DIR/m2-assets/"*.jpg "$WORKDIR/m2-assets/"
 cp "$SOURCE_DIR/server.py" "$WORKDIR/server.py"
@@ -75,7 +78,7 @@ if git -C "$WORKDIR" diff --quiet && git -C "$WORKDIR" diff --cached --quiet; th
   exit 0
 fi
 
-git -C "$WORKDIR" add README.md index.html radar.html m2-styles.css m2-data.js m2-app.js m2-table.html m2-table.css m2-table-data.js m2-sector-map.js m2-valuation-map.js m2-table-app.js m2-snapshot.json m2-assets server.py vercel.json .gitignore .vercelignore api/dashboard.py api/m2-watchlist.py api/m2-history.py
+git -C "$WORKDIR" add README.md index.html radar.html m2-styles.css m2-data.js m2-app.js m2-table.html m2-table.css m2-table-data.js m2-sector-map.js m2-valuation-map.js m2-table-app.js m2-snapshot.json m2-history-index.json m2-history m2-assets server.py vercel.json .gitignore .vercelignore api/dashboard.py api/m2-watchlist.py api/m2-history.py
 git -C "$WORKDIR" commit -m "$COMMIT_MESSAGE"
 git -C "$WORKDIR" push origin "$BRANCH"
 
