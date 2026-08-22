@@ -75,8 +75,8 @@ for url in index_urls:
     with urllib.request.urlopen(req, timeout=20) as response:
         data = json.loads(response.read().decode("utf-8"))
     print("asOf:", data.get("asOf"), "available/total:", data.get("availableCount"), data.get("totalCount"))
-    if data.get("availableCount") != 437 or data.get("totalCount") != 439:
-        raise RuntimeError("M2 lazy history index counts are incorrect")
+    if not data.get("totalCount") or data.get("availableCount") != data.get("totalCount") or data.get("missingCodes"):
+        raise RuntimeError("M2 candidate lazy history coverage is incomplete")
 
 for code in ("600397", "600353", "600988"):
     url = f"https://www.heimaq.com/m2-history/{code}.json"

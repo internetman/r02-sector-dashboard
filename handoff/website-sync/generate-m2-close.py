@@ -34,6 +34,7 @@ BASE_COLS = {
 
 FORMAL_STAGES = {"S1→S2过渡", "S2趋势", "S2延伸"}
 S2_STAGES = {"S2趋势", "S2延伸", "S2转弱"}
+CANDIDATE_MIN_MA200_SLOPE = 0.20
 
 
 def infer_close_date(path: Path, columns: list[str]) -> dt.date:
@@ -200,9 +201,28 @@ def js(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
+def history_market_signature(payload: dict[str, Any] | None) -> tuple[Any, ...]:
+    fields = ("date", "open", "close", "high", "low", "volume", "amountYi", "amplitude", "pct", "change", "turnover")
+    signature = []
+    for row in (payload or {}).get("rows") or []:
+        values = []
+        for field in fields:
+            value = row.get(field)
+            number = finite(value)
+            values.append(round(number, 8) if number is not None else value)
+        signature.append(tuple(values))
+    return tuple(signature)
+
+
 def write_snapshot_bundle(snapshot: dict[str, Any]) -> None:
     """Write the full API snapshot plus small files for lazy chart loading."""
     history = snapshot.get("history") if isinstance(snapshot.get("history"), dict) else {}
+    committed_history = load_committed_snapshot_history()
+    for code, payload in list(history.items()):
+        committed = committed_history.get(code) or committed_history.get(bare(code))
+        if committed and history_market_signature(committed) == history_market_signature(payload):
+            history[code] = committed
+    snapshot["history"] = history
     history_dir = ROOT / "m2-history"
     history_dir.mkdir(exist_ok=True)
     expected_files = {f"{bare(code)}.json" for code in history}
@@ -213,19 +233,20 @@ def write_snapshot_bundle(snapshot: dict[str, Any]) -> None:
         (history_dir / f"{bare(code)}.json").write_text(js(payload), encoding="utf-8")
 
     quote_codes = {bare(item.get("code") or item.get("symbol")) for item in snapshot.get("quotes") or []}
-    available_codes = sorted({bare(code) for code in history})
+    candidate_codes = {bare(code) for code in snapshot.get("candidateCodes") or quote_codes}
+    available_codes = sorted({bare(code) for code in history} & candidate_codes)
     index = {
         "schemaVersion": 1,
         "generatedAt": snapshot.get("generatedAt"),
         "asOf": snapshot.get("asOf"),
         "maxAgeHours": snapshot.get("maxAgeHours"),
         "barStatus": snapshot.get("barStatus"),
-        "sourceStatus": snapshot.get("sourceStatus"),
+        "sourceStatus": snapshot.get("candidateSourceStatus") or snapshot.get("sourceStatus"),
         "source": snapshot.get("source"),
-        "totalCount": len(quote_codes),
+        "totalCount": len(candidate_codes),
         "availableCount": len(available_codes),
         "availableCodes": available_codes,
-        "missingCodes": sorted(quote_codes - set(available_codes)),
+        "missingCodes": sorted(candidate_codes - set(available_codes)),
         "warnings": snapshot.get("warnings") or [],
     }
     (ROOT / "m2-history-index.json").write_text(js(index), encoding="utf-8")
@@ -559,6 +580,12 @@ def classify_stage(row: dict[str, Any], metrics: dict[str, Any], ever_s2: bool) 
     if transition:
         return "S1→S2过渡", f"价格站上MA150/MA200，MA200近20日 {pct_text(slope200, 2)}且连续上行，MA50斜率 {pct_text(slope50, 2)}。"
     return "待复核", f"未同时满足S1→S2或S2硬条件；MA200近20日 {pct_text(slope200, 2)}、MA50近20日 {pct_text(slope50, 2)}。"
+
+
+def is_website_candidate(row: dict[str, Any]) -> bool:
+    """Keep weakened or non-rising MA200 records in history, not the candidate pool."""
+    slope200 = finite(row.get("ma200SlopePct20d"))
+    return row.get("stage") != "S2转弱" and slope200 is not None and slope200 >= CANDIDATE_MIN_MA200_SLOPE
 
 
 def classify(row: dict[str, Any], pivot: dict[str, Any], metrics: dict[str, Any], close_label: str) -> dict[str, Any]:
@@ -1246,15 +1273,41 @@ def committed_legacy_state() -> dict[str, dict[str, Any]]:
         return {}
 
 
+def committed_stage_state() -> tuple[str, dict[str, dict[str, Any]]]:
+    try:
+        result = subprocess.run(
+            ["git", "show", "HEAD:m2-stage-state.json"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        payload = json.loads(result.stdout)
+        rows = payload.get("rows") or []
+        state = {str(row["code"]): row for row in rows if isinstance(row, dict) and row.get("code")}
+        return str(payload.get("asOf") or ""), state
+    except (subprocess.SubprocessError, OSError, json.JSONDecodeError):
+        return "", {}
+
+
 def load_stage_state(path: Path, close_iso: str) -> dict[str, dict[str, Any]]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return legacy_rows_as_state() or committed_legacy_state()
-    if str(payload.get("asOf") or "") >= close_iso:
-        return committed_legacy_state()
+    payload_as_of = str(payload.get("asOf") or "")
     rows = payload.get("rows") or []
-    return {str(row["code"]): row for row in rows if isinstance(row, dict) and row.get("code")}
+    state = {str(row["code"]): row for row in rows if isinstance(row, dict) and row.get("code")}
+    if payload_as_of == close_iso:
+        committed_as_of, committed = committed_stage_state()
+        if committed_as_of == close_iso:
+            return committed
+        return state
+    if payload_as_of > close_iso:
+        committed_as_of, committed = committed_stage_state()
+        return committed if committed_as_of < close_iso else (legacy_rows_as_state() or committed_legacy_state())
+    return state
 
 
 def main_stage() -> int:
@@ -1282,8 +1335,13 @@ def main_stage() -> int:
     if args.external_history_json:
         fallback_histories.update(load_snapshot_history(args.external_history_json))
 
-    prior_by_code = load_stage_state(ROOT / "m2-stage-state.json", close_iso)
-    prior_formal = {code for code, row in prior_by_code.items() if row.get("stage") in FORMAL_STAGES}
+    committed_state_as_of, committed_state = committed_stage_state()
+    same_close_baseline = committed_state_as_of == close_iso and bool(committed_state)
+    prior_by_code = committed_state if same_close_baseline else load_stage_state(ROOT / "m2-stage-state.json", close_iso)
+    prior_formal = {
+        code for code, row in prior_by_code.items()
+        if (bool(row.get("priorQualified")) if same_close_baseline else row.get("stage") in FORMAL_STAGES)
+    }
     ordered_codes = list(current_by_code)
     ordered_codes.extend(code for code in prior_by_code if code not in current_by_code)
 
@@ -1385,7 +1443,9 @@ def main_stage() -> int:
         rating = classify(row_seed, pivot, metrics, close_label)
         formal = stage in FORMAL_STAGES
         previous_stage = prior.get("stage")
-        if not previous_stage:
+        if same_close_baseline and previous_stage == stage and prior.get("transition"):
+            transition = str(prior["transition"])
+        elif not previous_stage:
             transition = f"{close_label} 首次按新规则分类为{stage}"
         elif previous_stage == stage:
             transition = f"{close_label} 维持{stage}"
@@ -1492,12 +1552,20 @@ def main_stage() -> int:
 
     rows.sort(key=lambda row: (row["currentQualified"], row["executionStars"], row["buyRank"], row["pct"] or -999), reverse=True)
     generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
-    stage_counts = {stage: sum(row["stage"] == stage for row in rows) for stage in ("S1→S2过渡", "S2趋势", "S2延伸", "S2转弱", "待复核")}
-    star_counts = {stars: sum(row["executionStars"] == stars for row in rows) for stars in range(1, 6)}
+    archive_stage_counts = {stage: sum(row["stage"] == stage for row in rows) for stage in ("S1→S2过渡", "S2趋势", "S2延伸", "S2转弱", "待复核")}
+    candidate_rows = [row for row in rows if is_website_candidate(row)]
+    removed_weak_rows = [row for row in rows if row["stage"] == "S2转弱"]
+    removed_ma200_rows = [
+        row for row in rows
+        if row["stage"] != "S2转弱"
+        and (finite(row.get("ma200SlopePct20d")) is None or finite(row.get("ma200SlopePct20d")) < CANDIDATE_MIN_MA200_SLOPE)
+    ]
+    stage_counts = {stage: sum(row["stage"] == stage for row in candidate_rows) for stage in ("S1→S2过渡", "S2趋势", "S2延伸", "待复核")}
+    star_counts = {stars: sum(row["executionStars"] == stars for row in candidate_rows) for stars in range(1, 6)}
     formal_rows = [row for row in rows if row["currentQualified"]]
-    star5 = [row for row in rows if row["executionStars"] == 5]
-    star4 = [row for row in rows if row["executionStars"] == 4]
-    star3 = [row for row in rows if row["executionStars"] == 3]
+    star5 = [row for row in candidate_rows if row["executionStars"] == 5]
+    star4 = [row for row in candidate_rows if row["executionStars"] == 4]
+    star3 = [row for row in candidate_rows if row["executionStars"] == 3]
     new_count = sum(row["currentQualified"] and not row["priorQualified"] for row in rows)
     changed = [row for row in rows if row["transition"].find(" → ") >= 0]
     table_payload = {
@@ -1511,7 +1579,11 @@ def main_stage() -> int:
         "quoteSourceStatus": "live" if not history_missing else "partial",
         "quoteSource": quote_source,
         "source": f"{close_label} S1→S2与S2双导出 + 历史日K精算",
-        "rowCount": len(rows),
+        "rowCount": len(candidate_rows),
+        "archivedRowCount": len(rows),
+        "removedCount": len(rows) - len(candidate_rows),
+        "removedWeakCount": len(removed_weak_rows),
+        "removedMa200Count": len(removed_ma200_rows),
         "importedCount": len(current_by_code),
         "transitionImportCount": len(transition_export),
         "s2ImportCount": len(s2_export),
@@ -1519,30 +1591,30 @@ def main_stage() -> int:
         "currentQualifiedCount": len(formal_rows),
         "priorCloseQualified": len(prior_formal),
         "newSinceClose": new_count,
-        "carryForwardCount": len(rows) - len(formal_rows),
+        "carryForwardCount": len(candidate_rows) - len(formal_rows),
         "priorityCount": len(star4),
         "executableCount": len(star5),
         "nearPivotCount": len(star3),
         "upCount": sum(row["currentQualified"] and (row["pct"] or 0) > 0 for row in rows),
         "stageCounts": stage_counts,
         "starCounts": star_counts,
-        "historyMissing": history_missing,
-        "note": "阶段与执行星级分离；进入阶段池不等于可以买入，5星仍需人工复核止损、仓位和流动性。",
+        "historyMissing": [code for code in history_missing if any(row["code"] == code for row in candidate_rows)],
+        "note": "候选池已排除S2转弱以及MA200近20日斜率低于0.20%或数据不足的股票；阶段符合不等于可以买入。",
         "topMovers": [row_summary(row) for row in sorted(formal_rows, key=lambda row: row["pct"] or -999, reverse=True)[:8]],
         "executableCandidates": [row_summary(row) for row in star5[:8]],
         "priorityCandidates": [row_summary(row) for row in star4[:8]],
         "nearPivotCandidates": [row_summary(row) for row in star3[:8]],
-        "rows": rows,
+        "rows": candidate_rows,
     }
     (ROOT / "m2-table-data.js").write_text("window.M2_TABLE_DATA = " + js(table_payload) + ";\n", encoding="utf-8")
 
     valuation_items: dict[str, dict[str, Any]] = {}
-    for row in rows:
+    for row in candidate_rows:
         item = {key: row.get(key) for key in ("code", "symbol", "name", "marketCap", "floatMarketCap", "peRatio", "pbRatio")}
         valuation_items[row["code"]] = item
         valuation_items[row["symbol"]] = item
     (ROOT / "m2-valuation-map.js").write_text(
-        "window.M2_VALUATION_MAP = " + js({"source": "Eastmoney close valuation fields", "generatedAt": generated_at, "rowCount": len(rows), "items": valuation_items}) + ";\n",
+        "window.M2_VALUATION_MAP = " + js({"source": "Eastmoney close valuation fields", "generatedAt": generated_at, "rowCount": len(candidate_rows), "items": valuation_items}) + ";\n",
         encoding="utf-8",
     )
 
@@ -1566,7 +1638,7 @@ def main_stage() -> int:
     m2_data = {
         "asOf": f"{close_iso} 收盘行情", "selectionAsOf": f"{close_iso} 收盘", "snapshotAsOf": close_iso,
         "quoteGeneratedAt": generated_at,
-        "market": {"status": "收盘复核完成" if not history_missing else "部分数据待复核", "note": f"{close_label}双股票池已按统一规则精算；阶段符合不等于买点。", "stats": [
+        "market": {"status": "收盘复核完成" if not history_missing else "部分数据待复核", "note": f"{close_label}候选池已排除S2转弱和MA200未明确上行股票；阶段符合不等于买点。", "stats": [
             {"label": "S1→S2过渡", "value": f"{stage_counts['S1→S2过渡']} 只"},
             {"label": "S2趋势", "value": f"{stage_counts['S2趋势']} 只"},
             {"label": "S2延伸", "value": f"{stage_counts['S2延伸']} 只"},
@@ -1574,12 +1646,13 @@ def main_stage() -> int:
         ]},
         "decision": {"title": f"正式阶段池：{len(formal_rows)} 只", "text": f"S1→S2过渡 {stage_counts['S1→S2过渡']} 只，S2趋势 {stage_counts['S2趋势']} 只，S2延伸 {stage_counts['S2延伸']} 只；5星 {len(star5)} 只。", "nextFocus": focus_rows[0]["name"] if focus_rows else "暂无", "pivot": focus_rows[0]["pivot"] if focus_rows else "未确认", "distance": focus_rows[0]["pivotDistance"] if focus_rows else "—"},
         "changes": [
-            {"time": "阶段", "text": f"过渡 {stage_counts['S1→S2过渡']} / S2趋势 {stage_counts['S2趋势']} / 延伸 {stage_counts['S2延伸']} / 转弱 {stage_counts['S2转弱']} / 待复核 {stage_counts['待复核']}。"},
+            {"time": "阶段", "text": f"过渡 {stage_counts['S1→S2过渡']} / S2趋势 {stage_counts['S2趋势']} / 延伸 {stage_counts['S2延伸']} / 待复核 {stage_counts['待复核']}。"},
             {"time": "星级", "text": f"5星 {len(star5)}、4星 {len(star4)}、3星 {len(star3)}；过渡池最高只给2星。"},
             {"time": "变化", "text": f"新进入正式池 {new_count} 只，阶段状态变化 {len(changed)} 只。"},
-            {"time": "边界", "text": "阶段与执行星级分离；5星也不替代止损、仓位和人工图形复核。"},
+            {"time": "移出", "text": f"S2转弱 {len(removed_weak_rows)} 只，MA200未明确上行 {len(removed_ma200_rows)} 只，仅保留历史记录。"},
         ],
         "stageCounts": stage_counts,
+        "removedCount": len(rows) - len(candidate_rows),
         "candidates": candidates,
     }
     (ROOT / "m2-data.js").write_text("window.M2_DATA = " + js(m2_data) + ";\n", encoding="utf-8")
@@ -1588,11 +1661,14 @@ def main_stage() -> int:
         "sourceStatus": "live" if len(snapshot_history) == len(ordered_codes) else "partial",
         "source": f"history plus {close_iso} close import append; snapshot fallback {len(set(reused_snapshot_codes))}",
         "quotes": quote_rows, "history": snapshot_history,
+        "candidateCodes": [row["symbol"] for row in candidate_rows],
+        "candidateSourceStatus": "live" if all(row["symbol"] in snapshot_history for row in candidate_rows) else "partial",
         "warnings": [] if not history_missing else [f"历史日K不足：{len(history_missing)}只（{'、'.join(history_missing[:10])}）"],
         "reusedSnapshotCodes": sorted(set(reused_snapshot_codes)),
     }
     write_snapshot_bundle(snapshot)
-    (ROOT / "m2-stage-state.json").write_text(json.dumps({"asOf": close_iso, "generatedAt": generated_at, "rows": rows}, ensure_ascii=False, indent=2), encoding="utf-8")
+    state_rows = list(prior_by_code.values()) if same_close_baseline else rows
+    (ROOT / "m2-stage-state.json").write_text(json.dumps({"asOf": close_iso, "generatedAt": generated_at, "rows": state_rows}, ensure_ascii=False, indent=2), encoding="utf-8")
 
     args.analysis_dir.mkdir(parents=True, exist_ok=True)
     top_names = lambda values, limit=20: "、".join(row["name"] for row in values[:limit]) or "暂无"
@@ -1600,24 +1676,24 @@ def main_stage() -> int:
         f"# {close_iso} M2 双阶段收盘分析", "", "## 数据校验", "",
         f"- S1→S2 导出：`导入/{args.transition_xlsx.name}`，有效 {len(transition_export)} 只。",
         f"- S2 导出：`导入/{args.s2_xlsx.name}`，有效 {len(s2_export)} 只。",
-        f"- 两表重叠 {len(set(transition_export) & set(s2_export))} 只，合并去重后 {len(current_by_code)} 只；合并历史观察记录后网站共 {len(rows)} 只。",
+        f"- 两表重叠 {len(set(transition_export) & set(s2_export))} 只，合并去重后 {len(current_by_code)} 只；历史状态档案 {len(rows)} 只，网站候选池 {len(candidate_rows)} 只。",
         f"- 历史日K完整 {len(snapshot_history)} 只，数据不足 {len(history_missing)} 只：{'、'.join(history_missing) or '无'}。", "",
         "## 阶段结论", "",
         f"- S1→S2过渡：{stage_counts['S1→S2过渡']} 只。",
         f"- S2趋势：{stage_counts['S2趋势']} 只。",
         f"- S2延伸：{stage_counts['S2延伸']} 只。",
-        f"- S2转弱：{stage_counts['S2转弱']} 只。",
         f"- 待复核：{stage_counts['待复核']} 只。", "",
-        "阶段归属按 S2趋势结构 → S2转弱历史 → S1→S2硬条件 → 待复核 的顺序唯一判定。MA50与MA150的相对位置不再作为过渡池额外硬限制，也没有21～60日的人为阶段边界。", "",
+        f"- 已从候选池移出：S2转弱 {len(removed_weak_rows)} 只，MA200近20日斜率低于0.20%或数据不足 {len(removed_ma200_rows)} 只；历史档案仍保留。", "",
+        "候选池只展示MA200近20日斜率至少0.20%且非S2转弱的股票。MA50与MA150的相对位置不作为过渡池额外硬限制，也没有21～60日的人为阶段边界。", "",
         "## 执行星级", "",
         "| 星级 | 数量 | 候选 |", "| --- | ---: | --- |",
-        *[f"| {stars}星 | {star_counts[stars]} | {top_names([row for row in rows if row['executionStars'] == stars], 12)} |" for stars in range(5, 0, -1)], "",
+        *[f"| {stars}星 | {star_counts[stars]} | {top_names([row for row in candidate_rows if row['executionStars'] == stars], 12)} |" for stars in range(5, 0, -1)], "",
         "## 重点候选", "",
         "| 股票 | 阶段 | 星级 | 收盘/涨跌 | MA200斜率20日 | MA50斜率20日 | Pivot | 成交额/均额 |", "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in (star5 + star4 + star3)[:20]:
         lines.append(f"| {row['name']} | {row['stage']} | {row['executionStars']} | {row['price']:.2f} / {pct_text(row['pct'], 2)} | {pct_text(row['ma200SlopePct20d'], 2)} | {pct_text(row['ma50SlopePct20d'], 2)} | {row['pivot']} | {row['amountRatio']:.2f}x |" if row["amountRatio"] is not None else f"| {row['name']} | {row['stage']} | {row['executionStars']} | {row['price']:.2f} / {pct_text(row['pct'], 2)} | {pct_text(row['ma200SlopePct20d'], 2)} | {pct_text(row['ma50SlopePct20d'], 2)} | {row['pivot']} | 数据不足 |")
-    lines.extend(["", "## 规则边界", "", "- S1→S2过渡股票最高为2星，只跟踪阶段变化，不提前视为S2买点。", "- S2延伸、S2转弱和待复核均为1星；4星和5星只允许出现在位置正常的S2趋势中。", "- 5星仍要求Pivot突破、成交额至少1.3倍、收缩证据、算法止损距离不超过8%和基本流动性；最终仍需人工复核。", "- 本报告是规则化筛选记录，不构成投资建议。"])
+    lines.extend(["", "## 规则边界", "", "- S1→S2过渡股票最高为2星，只跟踪阶段变化，不提前视为S2买点。", "- S2转弱和MA200未明确上行的股票不进入网站候选池；S2延伸和待复核最高为1星。", "- 5星仍要求Pivot突破、成交额至少1.3倍、收缩证据、算法止损距离不超过8%和基本流动性；最终仍需人工复核。", "- 本报告是规则化筛选记录，不构成投资建议。"])
     (args.analysis_dir / f"{close_iso} M2收盘分析.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     sector_script = Path(__file__).with_name("generate-m2-sector-map.py")
@@ -1626,7 +1702,7 @@ def main_stage() -> int:
             subprocess.run([sys.executable, str(sector_script)], check=True, timeout=120)
         except (subprocess.SubprocessError, OSError) as error:
             print(f"warning: sector map refresh failed: {error}", file=sys.stderr)
-    print(json.dumps({"rows": len(rows), "imports": len(current_by_code), "stages": stage_counts, "stars": star_counts, "historyMissing": history_missing}, ensure_ascii=False))
+    print(json.dumps({"candidates": len(candidate_rows), "archived": len(rows), "imports": len(current_by_code), "stages": stage_counts, "archiveStages": archive_stage_counts, "stars": star_counts, "removedWeak": len(removed_weak_rows), "removedMa200": len(removed_ma200_rows), "historyMissing": history_missing}, ensure_ascii=False))
     return 0
 
 

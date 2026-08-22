@@ -44,13 +44,13 @@
           <div>
             <div class="section-kicker">WHY THIS TABLE EXISTS</div>
             <h2>分开看过渡与趋势</h2>
-            <p>网站先按统一规则唯一判定 S1→S2、S2趋势、S2延伸、S2转弱和待复核，再独立计算 Pivot、量能与执行星级。阶段符合不等于可以买入。</p>
+            <p>候选池只保留 MA200 明确上行的 S1→S2、S2趋势、S2延伸和待复核股票；S2转弱和 MA200 未上行股票移出页面，仅保留历史记录。</p>
           </div>
           <div class="table-source">SOURCE<br /><strong id="tableSource">—</strong></div>
         </section>
 
         <section class="table-summary" aria-label="导入表摘要">
-          <article><span>观察池</span><strong id="summaryTotal">—</strong><small>持续记录</small></article>
+          <article><span>候选池</span><strong id="summaryTotal">—</strong><small>MA200明确上行</small></article>
           <article><span>S1→S2过渡</span><strong id="summaryStacked">—</strong><small id="summaryQualifiedLabel">正式过渡池</small></article>
           <article><span>S2趋势</span><strong id="summaryAbove200">—</strong><small>位置正常</small></article>
           <article><span>S2延伸</span><strong id="summaryNearHigh">—</strong><small>趋势仍在，不追高</small></article>
@@ -64,7 +64,7 @@
               <h2>从每日导出到执行星级</h2>
               <p>先判阶段，再判形态、Pivot、量能和执行风险。过渡池最高 2 星；4 星和 5 星只允许出现在位置正常的 S2 趋势中。</p>
             </div>
-            <div class="deduction-stamp"><span>推演基准</span><strong id="deductionAsOf">收盘</strong><small>观察池并集 · 自动更新</small></div>
+            <div class="deduction-stamp"><span>推演基准</span><strong id="deductionAsOf">收盘</strong><small>候选池 · MA200上行</small></div>
           </div>
           <div class="deduction-flow" aria-label="筛选推演路径">
             <div><small>01 / 旧池</small><strong id="flowTotal">—</strong><span>上一观察池</span></div>
@@ -89,7 +89,7 @@
 
         <section class="table-controls" aria-label="表格筛选">
           <label class="table-search"><span>查找股票</span><input id="tableSearch" type="search" placeholder="代码或简称" /></label>
-          <label><span>阶段筛选</span><select id="tableStageFilter"><option value="all">全部阶段</option><option value="S1→S2过渡">S1→S2过渡</option><option value="S2趋势">S2趋势</option><option value="S2延伸">S2延伸</option><option value="S2转弱">S2转弱</option><option value="待复核">待复核</option></select></label>
+          <label><span>阶段筛选</span><select id="tableStageFilter"><option value="all">全部阶段</option><option value="S1→S2过渡">S1→S2过渡</option><option value="S2趋势">S2趋势</option><option value="S2延伸">S2延伸</option><option value="待复核">待复核</option></select></label>
           <label><span>执行视图</span><select id="tableFilter"><option value="all">全部星级</option><option value="star5">5星可执行</option><option value="star4">4星确认中</option><option value="star3">3星重点盯</option><option value="priority">买点候选</option><option value="wait">当前待观察</option><option value="caution">过热不追</option><option value="review">待复核</option><option value="stacked">MA50 &gt; MA150 &gt; MA200</option><option value="nearHigh">距区间高点 ≤ 10%</option></select></label>
           <label><span>板块分类</span><select id="sectorFilter"><option value="all">全部板块</option></select></label>
           <label><span>市场筛选</span><select id="tableMarketFilter"><option value="all">全部市场</option><option value="上交所">上交所</option><option value="深交所">深交所</option><option value="北交所">北交所</option></select></label>
@@ -135,7 +135,7 @@
               <tbody id="tableBody"></tbody>
             </table>
           </div>
-          <div class="table-footnote"><span class="footnote-mark">!</span><p>本页是待观察股票池，不是买点触发表。每天导出不同，曾经按规则入池但暂未确认失效的股票会保留为“待复核观察”；确认跌破结构、失去趋势或人工淘汰后再移出。</p></div>
+          <div class="table-footnote"><span class="footnote-mark">!</span><p>本页是候选股票池，不是买点触发表。S2转弱、MA200近20日斜率低于0.20%或数据不足的股票不在此展示，但历史状态仍会保留，便于转强后重新入池。</p></div>
         </section>
 
         <footer class="page-footer">M2 / 候选池负责横向筛选 · 卡片页负责候选足迹 · R02 负责板块环境 <a class="footer-link" href="/">返回 M2 首页 ↗</a></footer>
@@ -144,6 +144,6 @@
     <script src="m2-table-data.js?v=20260821-close"></script>
     <script src="m2-sector-map.js?v=20260821-close"></script>
     <script src="m2-valuation-map.js?v=20260821-close"></script>
-    <script src="m2-table-app.js?v=20260821-stages"></script>
+    <script src="m2-table-app.js?v=20260822-candidate-gate"></script>
   </body>
 </html>

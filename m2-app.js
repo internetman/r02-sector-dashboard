@@ -469,13 +469,13 @@
   };
   const populateStageFilter = () => {
     if (!homeStageFilter) return;
-    const stages = ["S1→S2过渡", "S2趋势", "S2延伸", "S2转弱", "待复核"];
+    const stages = ["S1→S2过渡", "S2趋势", "S2延伸", "待复核"];
     homeStageFilter.innerHTML = `<option value="all">全部阶段 · ${data.candidates.length}只</option>${stages.map((stage) => {
       const count = data.candidates.filter((item) => item.stage === stage).length;
       return `<option value="${stage}">${stage} · ${count}只</option>`;
     }).join("")}`;
     if ($("transitionPoolCount")) $("transitionPoolCount").textContent = `${data.candidates.filter((item) => item.stage === "S1→S2过渡").length}只`;
-    if ($("s2PoolCount")) $("s2PoolCount").textContent = `${data.candidates.filter((item) => ["S2趋势", "S2延伸", "S2转弱"].includes(item.stage)).length}只`;
+    if ($("s2PoolCount")) $("s2PoolCount").textContent = `${data.candidates.filter((item) => ["S2趋势", "S2延伸"].includes(item.stage)).length}只`;
   };
   const populateMarketFilter = () => {
     if (!homeMarketFilter) return;
@@ -510,7 +510,7 @@
       const marketMatch = marketValue === "all" || fields.market === marketValue;
       const poolMatch = activePool === "all"
         || (activePool === "transition" && item.stage === "S1→S2过渡")
-        || (activePool === "s2" && ["S2趋势", "S2延伸", "S2转弱"].includes(item.stage));
+        || (activePool === "s2" && ["S2趋势", "S2延伸"].includes(item.stage));
       return categoryMatch && starMatch && stageMatch && marketMatch && poolMatch;
     });
   };
@@ -528,7 +528,7 @@
           <span class="state-chip ${item.stateClass}">${item.state}</span>
         </div>
       </div>
-      <div class="stock-price-row"><strong>${item.price}</strong><span class="change ${String(item.change).indexOf("−") === 0 || String(item.change).indexOf("-") === 0 ? "down" : "up"}">${item.change}</span><span class="stage-tag ${item.stage === "S1→S2过渡" ? "stage-transition" : item.stage === "S2趋势" ? "stage-s2" : item.stage === "S2延伸" ? "stage-extended" : item.stage === "S2转弱" ? "stage-weak" : "stage-review"}">${item.stage}</span></div>
+      <div class="stock-price-row"><strong>${item.price}</strong><span class="change ${String(item.change).indexOf("−") === 0 || String(item.change).indexOf("-") === 0 ? "down" : "up"}">${item.change}</span><span class="stage-tag ${item.stage === "S1→S2过渡" ? "stage-transition" : item.stage === "S2趋势" ? "stage-s2" : item.stage === "S2延伸" ? "stage-extended" : "stage-review"}">${item.stage}</span></div>
       <div class="pivot-focus ${item.pivotPrice ? "ready" : "pending"}">
         <span>参考 PIVOT 买点 / 平台上沿</span>
         <strong>${item.pivot}</strong>
